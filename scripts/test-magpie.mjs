@@ -43,21 +43,19 @@ const cipher = createCipheriv("aes-128-cbc", cookieKey, Buffer.alloc(16, 32))
 const encryptedCookie = Buffer.concat([Buffer.from("v10"), cipher.update(Buffer.concat([createHash("sha256").update(".scnet.cn").digest(), Buffer.from("scnet-fixture")])), cipher.final()])
 browserDB.prepare("INSERT INTO cookies VALUES ('.scnet.cn', 'session', '', ?, '/', 0, 0, '')").run(encryptedCookie)
 browserDB.close(); cookieKey.fill(0)
-const confirmationFile = join(sandbox, "confirmation-url.txt")
 
 await writeFile(preload, `
-import { appendFileSync, writeFileSync } from "node:fs"
+import { appendFileSync } from "node:fs"
 import { mock } from "bun:test"
 import * as os from "node:os"
 import * as cp from "node:child_process"
 const originalExec = cp.execFile
 mock.module("node:os", () => ({ ...os, homedir: () => ${JSON.stringify(fixtureHome)} }))
 function fixtureExec(file, args, options, callback) {
-  if (!["/usr/bin/osascript", "/usr/bin/security", "/usr/bin/open"].includes(file)) return originalExec(file, args, options, callback)
+  if (!["/usr/bin/osascript", "/usr/bin/security"].includes(file)) return originalExec(file, args, options, callback)
   let stdout = ""
   if (file === "/usr/bin/osascript") stdout = "com.google.Chrome.beta"
   if (file === "/usr/bin/security") stdout = Buffer.from("fixture-keychain")
-  if (file === "/usr/bin/open") writeFileSync(${JSON.stringify(confirmationFile)}, args[0])
   queueMicrotask(() => callback(null, stdout, ""))
   return { kill() {} }
 }
@@ -84,7 +82,7 @@ globalThis.fetch = async (input, init) => {
     if (req.headers.has("authorization")) throw new Error("Inference key leaked to console")
     return Response.json({ code: "0", data: [
       { resourceAccountId: "fixture-event", resourceId: "fixture-code", name: "DeepSeek 活动套餐", status: "enable", totalAmount: "60000", usedAmount: "1234.5", maxExpireTime: "2099-11-24 23:59:59" },
-      { resourceAccountId: "fixture-standard", resourceId: "fixture-code", name: "标准套餐", status: "enable", totalAmount: "240000", usedAmount: "99999", maxExpireTime: "2099-11-24 23:59:59" },
+      { resourceAccountId: "fixture-standard", resourceId: "fixture-code", name: "标准套餐", status: "enable", totalAmount: "240000", usedAmount: "99999", maxExpireTime: "2099-12-24 23:59:59" },
     ] })
   }
   if (req.url !== "https://api.scnet.cn/api/llm/v1/chat/completions") throw new Error("Unexpected upstream URL")
@@ -141,43 +139,15 @@ const sandboxProfile = `(version 1)
 const launch = (args, stdio) => spawn("/usr/bin/sandbox-exec", ["-p", sandboxProfile, magpie, ...args], { env, cwd: sandbox, stdio })
 const logs = []
 async function cli(args, input = "") {
-  if (args.join(" ") === "plugin login scnet-token-plan 1") await rm(confirmationFile, { force: true })
   const child = launch(args, ["pipe", "pipe", "pipe"])
-  let output = "", interaction, interactionError
-  const collect = data => {
-    output += data
-    if (args.join(" ") !== "plugin login scnet-token-plan 1" || interaction) return
-    if (!output.includes("https://www.scnet.cn/ac/api/auth/loginSsoRedirect.action")) return
-    interaction = (async () => {
-      let address
-      const until = Date.now() + 15000
-      while (Date.now() < until) {
-        try { address = await readFile(confirmationFile, "utf8"); break } catch {}
-        await delay(50)
-      }
-      assert.ok(address, "The authenticated browser flow must open the confirmation page")
-      const url = new URL(address)
-      const post = async (path, body) => {
-        const response = await fetch(url.origin + path, { method: "POST", headers: {
-          "content-type": "application/json", origin: url.origin, "x-scnet-login": url.hash.slice(1),
-        }, body: JSON.stringify(body) })
-        assert.equal(response.status, 200)
-        return response.json()
-      }
-      const data = await post("/account", {})
-      assert.equal(data.user, "Fixture browser")
-      await post("/choose", { id: "fixture-event" })
-    })().catch(error => { interactionError = error; child.kill("SIGKILL") })
-  }
-  child.stdout.on("data", collect)
-  child.stderr.on("data", collect)
+  let output = ""
+  child.stdout.on("data", data => { output += data })
+  child.stderr.on("data", data => { output += data })
   child.stdin.on("error", () => {})
   child.stdin.end(input)
   const timer = setTimeout(() => child.kill("SIGKILL"), 45000)
   try {
     const code = await new Promise((done, reject) => { child.once("error", reject); child.once("close", done) })
-    await interaction
-    if (interactionError) throw interactionError
     logs.push({ args, code, output })
     assert.equal(code, 0, `magpie ${args.join(" ")}: ${output}`)
     return output
@@ -268,13 +238,15 @@ try {
     const quota = await cli(["quota"])
     assert.match(quota, /58,765.5|58765.5/)
     assert.match(quota, /Credits/)
-    await cli(["plugin", "login", "scnet-token-plan", "1"])
+    // The browser sign-in completes by itself once the session is read.
+    assert.match(await cli(["plugin", "login", "scnet-token-plan", "1"]), /loginSsoRedirect\.action/)
     await cli(["plugin", "login", "scnet-token-plan", "1"])
     const browserAuth = JSON.parse(await readFile(join(env.XDG_CONFIG_HOME, "magpie", "plugin-auth.json"), "utf8"))
     assert.equal(Object.keys(browserAuth).length, 2, "Repeated browser login updates its identity and preserves the manual account")
     const signedIn = Object.values(browserAuth).find(a => a.metadata?.scnetUserId === "fixture-user")
     assert.equal(signedIn.key, fixtureKey)
     assert.equal(signedIn.metadata.quotaPlan, "fixture-event")
+    assert.equal(signedIn.metadata.email, "超算互联网 · Fixture browser · DeepSeek 活动套餐")
     assert.equal(signedIn.metadata.consoleCookie, "session=scnet-fixture")
     assert.match(await cli(["quota"]), /Fixture browser/)
     // The plugin's own management prompts, on the installed, unmodified

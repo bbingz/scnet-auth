@@ -17,19 +17,21 @@ magpie plugin add github:bbingz/scnet-auth
 magpie plugin login scnet-token-plan
 ```
 
-Choose **浏览器登录超算互联网（macOS 官网）**. Magpie opens SCNet's official desktop login page in the default browser. Sign in normally, or use its existing website session. If macOS asks for browser Keychain access, allow this attempt. A local confirmation page then shows the account and subscriptions; only confirmation saves the existing Token Plan key and quota session. The plugin never creates/resets keys or purchases plans.
+Choose **浏览器登录超算互联网（macOS 官网）**. Magpie opens SCNet's official desktop login page in the default browser. Sign in normally, or use its existing website session. If macOS asks for browser Keychain access, allow this attempt. Once SCNet accepts the session, the plugin reads the account name, existing Token Plan key, plan and models and saves the account by itself; no local confirmation page opens. The plugin never creates/resets keys or purchases plans.
 
 Automatic import currently supports macOS Chrome (stable/Beta/Dev/Canary), Edge and Brave. Real account/key/model/quota reads were verified with Chrome Beta; other supported browser mappings have not had live-account acceptance. Safari, Windows, Linux and headless environments use the advanced manual method. Private/incognito browser sessions are not supported.
 
 Only the default browser's last-used profile is accessed. Read-only SQL selects exact SCNet hosts and console paths before cookie data leaves the database. No other profiles are scanned; no whole database is copied; other sites, passwords and browsing history are not read. The macOS browser Keychain secret is used only in memory to decrypt SCNet cookies, then cleared. Refused OS access ends the attempt; no security settings are modified. This is scoped browser-session import, not a claim of official SCNet OAuth support.
 
-The official login page collects credentials. The later loopback page only confirms the identity/subscription and collects no phone number, OTP or password. For a different account, switch accounts on SCNet and click the confirmation page's reload button. Identity is rechecked before saving. The listener binds only to `127.0.0.1`, requires a per-attempt capability and exact Origin/Host, rejects cross-site requests, and closes on success, cancellation or a five-minute timeout. Refreshing the confirmation page requires a new attempt. No extension or separate browser is launched.
+Only the official login page collects credentials; the plugin opens no local page and runs no local listener. A browser already signed in to another SCNet account connects that account; to use a different one, sign out or switch on SCNet and start the browser sign-in again. Signing in again with the same user and plan updates that account. Reading stops after five minutes without a session, and nothing is saved. No extension or separate browser is launched.
+
+SCNet allows one Token Plan per account. When the console lists a used-up plan beside a newly bought one, the plan with Credits left is chosen; if several have Credits, the one ending first. If the plan's models cannot be read, the sign-in fails and points to manual setup rather than guessing models.
 
 ## Remove a saved account
 
 Version 0.3.4 adds **管理已保存账号（移除旧 KEY）** to the plugin's method picker. Open the SCNet provider, choose **Add another account**, then this management option. Select a record and confirm its removal. Cancel before confirmation changes nothing; after the completion message, Cancel closes management. Reopen the provider to refresh its list.
 
-This flow does not add an account or open a browser. It can remove the first or last saved SCNet account on unmodified Magpie 0.1.1364. Only the selected local key/cookie record is removed; other records, including another slot carrying the same key, and the vendor's key remain intact. Removing the last account makes its models unavailable until another account is added. The original browser sign-in and confirmation flow are unchanged.
+This flow does not add an account or open a browser. It can remove the first or last saved SCNet account on unmodified Magpie 0.1.1364. Only the selected local key/cookie record is removed; other records, including another slot carrying the same key, and the vendor's key remain intact. Removing the last account makes its models unavailable until another account is added. It does not change the browser sign-in.
 
 ## Advanced manual setup
 

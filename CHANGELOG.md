@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.5 — 2026-10-25
+
+- Browser sign-in completes by itself, as WorkBuddy's does: once SCNet accepts the default browser's session, the account, existing key, plan and models are saved. The local "连接到 Magpie" confirmation page, its loopback listener and `signin.html` are removed at the user's request. SCNet allows one Token Plan per account, so the enabled, unexpired plan with Credits left is chosen (the one ending first when several have Credits); a plan whose models cannot be read fails with a pointer to manual setup instead of a model form.
+- Mark every Token Plan model as reasoning-capable. SCNet's plan page lists all models with deep thinking; only DeepSeek IDs were marked before.
+- Write the remaining English loader error and the quota hint for unconnected accounts in Chinese, without pointing manual/non-macOS users at the macOS browser sign-in.
+
+CHECKS_RUN: new sign-in, plan-choice and reasoning tests failed on 0.3.4; 46 unit tests pass; isolated real Magpie 0.1.1364 run passes manual/browser sign-in (browser completing without a page), repeat login, quota, plugin account removal and 12 gateway cases.
+
+CHECKS_NOT_RUN: Chromium/WebKit account-management UI run (that code is unchanged); a live SCNet browser sign-in through the new flow (needs the user's browser session and Keychain consent).
+
 ## 0.3.4 — 2026-10-24
 
 - Add a plugin-owned Chinese account-management option to Magpie's existing method picker. Users can select and confirm removal of any saved SCNet record, including the first and last, without changing Magpie, opening another browser page or signing in again. The original website login and confirmation flow are unchanged.

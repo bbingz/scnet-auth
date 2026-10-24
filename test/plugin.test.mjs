@@ -33,6 +33,9 @@ test("models are scoped to each account; a global catalog is never fetched", asy
   assert.deepEqual(Object.keys(regular), ["GLM-5.3", "Kimi-K3"])
   assert.equal(regular["GLM-5.3"].api.id, "GLM-5.3")
   assert.equal(regular["GLM-5.3"].limit.context, 0)
+  // SCNet lists every Token Plan model with deep thinking, not only DeepSeek.
+  assert.equal(regular["GLM-5.3"].capabilities.reasoning, true)
+  assert.equal(regular["Kimi-K3"].capabilities.reasoning, true)
   assert.equal(await hooks.provider.models(provider), provider.models)
   assert.equal(typeof hooks.auth.usage, "function")
 })
@@ -126,9 +129,9 @@ test("logout and missing auth fail closed without a network request", async () =
   const loader = await hooks.auth.loader(async () => auth)
   auth = undefined
   const send = mock.method(globalThis, "fetch", () => { throw new Error("unexpected network") })
-  await assert.rejects(loader.fetch(URL), /Sign in/)
+  await assert.rejects(loader.fetch(URL), /请重新登录/)
   for (const value of [undefined, {}, { type: "oauth", access: "fixture" }, key(" ")]) {
-    await assert.rejects(hooks.auth.loader(async () => value), /Sign in/)
+    await assert.rejects(hooks.auth.loader(async () => value), /请重新登录/)
   }
   assert.equal(send.mock.callCount(), 0)
 })

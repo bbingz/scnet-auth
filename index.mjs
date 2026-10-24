@@ -21,7 +21,7 @@ function modelIds(value) {
 
 function requireKey(auth) {
   if (auth?.type !== "api" || typeof auth.key !== "string" || !auth.key.trim()) {
-    throw new Error("Sign in with your SCNet Token Plan API key")
+    throw new Error("缺少超算互联网 Token Plan API Key，请重新登录")
   }
   return auth.key.trim()
 }
@@ -36,7 +36,8 @@ function model(id, known) {
     // SCNet's public plan documentation does not specify these limits.
     limit: known?.limit ?? { context: 0, output: 0 },
     capabilities: known?.capabilities ?? {
-      reasoning: id.startsWith("DeepSeek-V4"), toolcall: true,
+      // Every Token Plan model is listed with deep thinking (深度思考).
+      reasoning: true, toolcall: true,
       input: { text: true }, output: { text: true },
     },
   }

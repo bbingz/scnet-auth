@@ -10,6 +10,9 @@ const number = (row, fields) => {
   }
 }
 const format = (value) => value.toLocaleString("en-US", { maximumFractionDigits: 6 })
+const TOTAL = ["totalAmount", "All", "planCredits", "monthlyCredits", "totalCredits"]
+const USED = ["usedAmount", "used", "usedCredits", "consumeCredits", "consumedCredits", "consume", "usage"]
+export const hasCredits = (row) => { const total = number(row, TOTAL), used = number(row, USED); return total > 0 && used !== undefined && used < total }
 export const planId = (row) => String(row.resourceAccountId ?? "")
 export const planName = (row) => row.name || row.resourceName || row.packageName || "Token Plan"
 
@@ -64,14 +67,14 @@ export async function usage(getAuth) {
   // A console failure must never mark a valid inference key as signed out.
   const base = { user: md.email || "", signIn: "kept" }
   if (auth?.type !== "api" || md.quota !== "console" || !md.consoleCookie || !md.quotaPlan) {
-    return { ...base, error: "未连接账号额度 · 请使用“浏览器登录超算互联网”" }
+    return { ...base, error: "未连接账号额度 · 重新登录并连接额度查询后显示 Credits" }
   }
   try {
     const matches = (await plans(md.consoleCookie)).filter(row => planId(row) === md.quotaPlan)
     if (matches.length !== 1) throw new Error("找不到唯一的已选套餐，请重新连接额度并选择套餐")
     const row = matches[0]
-    const total = number(row, ["totalAmount", "All", "planCredits", "monthlyCredits", "totalCredits"])
-    const used = number(row, ["usedAmount", "used", "usedCredits", "consumeCredits", "consumedCredits", "consume", "usage"])
+    const total = number(row, TOTAL)
+    const used = number(row, USED)
     if (total === undefined || total <= 0 || used === undefined) {
       throw new Error("套餐未返回完整 Credits 用量，请在 SCNet 控制台核对")
     }

@@ -131,10 +131,3 @@ export async function createBrowserSession({ signal, platform = process.platform
     clear() { closed = true; key?.fill(0); key = undefined },
   }
 }
-
-export async function openConfirmation(url, signal) {
-  const parsed = new URL(url)
-  if (parsed.origin !== `http://127.0.0.1:${parsed.port}` || parsed.pathname !== "/" || !parsed.hash) throw new LoginError("无效的本机确认地址")
-  try { await run("/usr/bin/open", [url], { timeout: 10000, signal, maxBuffer: 4096 }) }
-  catch { throw new LoginError("无法打开套餐确认页，请返回 Magpie 重新登录") }
-}

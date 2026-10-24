@@ -30,11 +30,11 @@ A valid session is checked using these fixed SCNet endpoints:
 - `GET /acx/llm/api-key/token-plan/query`: existing Token Plan key; no create/reset request.
 - `GET /acx/llm/api/package/overview?packageType=TokenPlan`, optionally `code`: exact subscription-to-model matching.
 
-After discovery, the browser opens a temporary local account/subscription confirmation page. Only display fields reach it; credentials remain in the plugin until confirmation. Host/Origin/capability/JSON checks, bounded bodies, CSP and a five-minute deadline protect the loopback API. A final identity/key/plan check rejects stale confirmations after an account switch. Refresh explicitly rereads the selected profile. Success/cancel/timeout stops access and clears the derived key. Cookies enter Magpie account metadata only after confirmation and are sent only to fixed SCNet console URLs.
+Since 0.3.5 the sign-in completes as soon as these reads succeed; no local confirmation page or listener is used. SCNet allows one Token Plan per account, so the plugin picks the enabled, unexpired plan with Credits left (the one ending first when several have Credits) and fails rather than guessing when that plan's models cannot be read. Success or a five-minute timeout stops access and clears the derived key. Cookies enter Magpie account metadata only on success and are sent only to fixed SCNet console URLs.
 
 ## Why earlier versions were replaced
 
-Version 0.3.0 launched an isolated browser. Version 0.3.1 used a local SMS form backed by the official desktop client's SMS endpoints. Both were rejected for this workflow. Version 0.3.2 removes the SMS implementation and uses the user's requested official-page/current-browser flow. The local confirmation page is not a login page.
+Version 0.3.0 launched an isolated browser. Version 0.3.1 used a local SMS form backed by the official desktop client's SMS endpoints. Both were rejected for this workflow. Version 0.3.2 removes the SMS implementation and uses the user's requested official-page/current-browser flow. Its local confirmation page was removed in 0.3.5 at the user's request.
 
 The tested arbitrary localhost CAS service was refused, while the official callback was accepted. Community WorkBuddy uses vendor login-state/token polling; JoyCode and Trae use vendor callbacks. SCNet's legacy WeChat QR polling endpoints are live, but their existence does not establish a generic desktop browser handoff. Version 0.3.2 therefore makes no claim of an official SCNet OAuth integration.
 
@@ -42,7 +42,7 @@ The tested arbitrary localhost CAS service was refused, while the official callb
 
 Real read-only checks on 2026-10-24: current default Chrome Beta session decrypted through macOS Keychain, SCNet identity and existing key accepted, one subscription's models resolved, and authenticated Credits returned. The quota reader was also exercised under Bun. Evidence contains only nonsecret outcomes and quota values, never the browser secret, cookies, API key or account identifier.
 
-Synthetic coverage: exact-host/path/expiry/partition filtering, Chromium decryption and host binding, read-only database integrity, unsupported formats/platforms, denied/cancelled Keychain access, official-page URL, delayed website login, confirmation isolation, account switching, cancellation and timeout. Real isolated Magpie CLI verifies callback persistence, repeated login, selected-plan quota and twelve gateway protocol cases. Its fixture uses a separate encrypted browser database and fake OS responses; OS sandboxing denies actual home credentials and Keychain.
+Synthetic coverage: exact-host/path/expiry/partition filtering, Chromium decryption and host binding, read-only database integrity, unsupported formats/platforms, denied/cancelled Keychain access, official-page URL, delayed website login, plan selection, missing models and timeout. Real isolated Magpie CLI verifies callback persistence, repeated login, selected-plan quota and twelve gateway protocol cases. Its fixture uses a separate encrypted browser database and fake OS responses; OS sandboxing denies actual home credentials and Keychain.
 
 Not yet verified: fresh signed-out website login followed by cookie flush/import; real accounts on Edge/Brave/Chrome channels other than Beta; Safari, Windows and Linux automatic import (unsupported); long-term session lifetime; native OpenCode. Internal SCNet APIs/browser storage can change. No real inference is needed for this authentication change.
 
