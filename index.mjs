@@ -1,5 +1,7 @@
 import { cookieError, date, planId, planName, plans, usage } from "./quota.mjs"
 import { startBrowserLogin } from "./browser-login.mjs"
+import { accountManagement } from "./accounts.mjs"
+import { isAbsolute } from "node:path"
 
 const ID = "scnet-token-plan"
 const BASE = "https://api.scnet.cn/api/llm/v1"
@@ -40,7 +42,9 @@ function model(id, known) {
   }
 }
 
-export async function SCNetAuthPlugin() {
+export async function SCNetAuthPlugin(input = {}) {
+  const management = input.project?.id === "magpie" && typeof input.directory === "string" && isAbsolute(input.directory) && typeof input.client?.auth?.remove === "function"
+    ? [accountManagement(input)] : []
   return {
     async config(config) {
       config.provider ??= {}
@@ -62,7 +66,7 @@ export async function SCNetAuthPlugin() {
       provider: ID,
       // A self-contained mark also works when the app cannot reach image hosts.
       icon: "data:image/svg+xml;base64," + Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#1259c3"/><path d="M18 19h28v8H26v5h20v13H18v-8h20v-5H18z" fill="white"/></svg>').toString("base64"),
-      methods: [{ type: "oauth", label: "浏览器登录超算互联网（macOS 官网）", authorize: () => startBrowserLogin() }, signInMethod()],
+      methods: [{ type: "oauth", label: "浏览器登录超算互联网（macOS 官网）", authorize: () => startBrowserLogin() }, signInMethod(), ...management],
       usage,
       async loader(getAuth) {
         requireKey(await getAuth())

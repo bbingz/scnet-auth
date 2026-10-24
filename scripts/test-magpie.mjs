@@ -23,6 +23,10 @@ const freePort = createServer()
 await new Promise((done) => freePort.listen(0, "127.0.0.1", done))
 const port = freePort.address().port
 await new Promise((done) => freePort.close(done))
+const freeWebPort = createServer()
+await new Promise(done => freeWebPort.listen(0, "127.0.0.1", done))
+const webPort = freeWebPort.address().port
+await new Promise(done => freeWebPort.close(done))
 const wrapper = join(sandbox, "bun-wrapper")
 const preload = join(sandbox, "upstream.mjs")
 const requests = join(sandbox, "requests.jsonl")
@@ -210,7 +214,7 @@ try {
     assert.equal(auth["scnet-token-plan"].key, fixtureKey)
     assert.equal(auth["scnet-token-plan"].metadata.email, "超算互联网 · Fixture main")
     assert.equal(auth["scnet-token-plan"].metadata.quota, "skip")
-    gateway = launch(["serve"], ["ignore", "pipe", "pipe"])
+    gateway = launch(["web", "--no-open", "--gateway", "--addr", `127.0.0.1:${webPort}`], ["ignore", "pipe", "pipe"])
     gateway.stdout.on("data", (d) => { gatewayLog += d })
     gateway.stderr.on("data", (d) => { gatewayLog += d })
     gatewayClosed = new Promise((done) => { gateway.once("close", done) })
@@ -273,8 +277,50 @@ try {
     assert.equal(signedIn.metadata.quotaPlan, "fixture-event")
     assert.equal(signedIn.metadata.consoleCookie, "session=scnet-fixture")
     assert.match(await cli(["quota"]), /Fixture browser/)
+    // The plugin's own management prompts, on the installed, unmodified
+    // Magpie host. No sign-in is authorized and no fake account is saved.
+    const web = `http://127.0.0.1:${webPort}`
+    const login = await fetch(web + `/?k=${env.MAGPIE_WEB_KEY}`, { redirect: "manual" })
+    const webCookie = login.headers.get("set-cookie").split(";")[0]
+    const api = async (path, body) => {
+      const response = await fetch(web + path, {
+        method: body ? "POST" : "GET", headers: { "content-type": "application/json", origin: web, cookie: webCookie },
+        body: body ? JSON.stringify(body) : undefined,
+      })
+      assert.equal(response.status, 200, await response.clone().text())
+      return response.json()
+    }
+    const providers = await api("/api/providers")
+    const method = providers.plugins.find(p => p.pid === "scnet-token-plan").methods.findIndex(m => m.label.includes("管理已保存账号"))
+    assert.ok(method >= 0, "The installed host must expose the plugin's management method")
+    if (process.env.SCNET_TEST_ACCOUNT_UI === "1") {
+      const { checkAccountUI } = await import("./test-accounts-ui.mjs")
+      await checkAccountUI({ web, key: env.MAGPIE_WEB_KEY, readAuth: async () => JSON.parse(await readFile(join(env.XDG_CONFIG_HOME, "magpie", "plugin-auth.json"), "utf8")) })
+    } else {
+      const ask = async inputs => (await api("/api/plugin-signin/prompt", { provider: "scnet-token-plan", method, inputs })).prompt
+      let inputs = {}
+      const list = await ask(inputs)
+      assert.equal(list.options.length, 2)
+      inputs[list.key] = list.options.find(o => o.label.includes("Fixture main")).value
+      const confirm = await ask(inputs)
+      assert.deepEqual(JSON.parse(await readFile(join(env.XDG_CONFIG_HOME, "magpie", "plugin-auth.json"), "utf8")), browserAuth, "Opening/canceling confirmation changes no credentials")
+      inputs[confirm.key] = confirm.options[0].value
+      assert.match((await ask(inputs)).message, /已移除/)
+      assert.match((await ask(inputs)).message, /已移除/)
+      const remaining = JSON.parse(await readFile(join(env.XDG_CONFIG_HOME, "magpie", "plugin-auth.json"), "utf8"))
+      assert.equal(Object.keys(remaining).length, 1)
+      assert.deepEqual(Object.values(remaining)[0], signedIn)
+      const last = await ask({})
+      inputs = { [last.key]: last.options[0].value }
+      const finalConfirm = await ask(inputs)
+      inputs[finalConfirm.key] = finalConfirm.options[0].value
+      assert.match((await ask(inputs)).message, /已移除/)
+      assert.match((await ask({})).message, /没有已保存/)
+    }
+    assert.deepEqual(JSON.parse(await readFile(join(env.XDG_CONFIG_HOME, "magpie", "plugin-auth.json"), "utf8")), {})
+    assert.equal((await api("/api/providers")).providers.some(p => p.account?.agent === "scnet-token-plan"), false)
     await cli(["plugin", "logout", "scnet-token-plan"])
-    console.log("PASS plugin add/list/login/logout; 12 gateway cases; manual and browser sign-in; repeat login; account naming; selected-plan quota")
+    console.log("PASS plugin add/list/login/logout; 12 gateway cases; browser/manual sign-in; repeat login; quota; plugin-only first/last account removal and cancellation")
   }
 } catch (error) {
   console.error(JSON.stringify(logs, null, 2))

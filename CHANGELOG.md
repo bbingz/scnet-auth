@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.3.4 — 2026-10-24
+
+- Add a plugin-owned Chinese account-management option to Magpie's existing method picker. Users can select and confirm removal of any saved SCNet record, including the first and last, without changing Magpie, opening another browser page or signing in again. The original website login and confirmation flow are unchanged.
+- Enumerate SCNet entries from the host-provided credential file and delegate deletion to `client.auth.remove`, preserving host locking, backups and cache invalidation. Show names or masked key suffixes. Confirmation tokens expire, stale records fail closed, and repeated/concurrent prompt requests share one deletion. Another slot carrying the same key and other providers' records stay intact.
+- Keep management in the prompt flow without credential authorization or a dummy sign-in. The host's Cancel control closes the completion message; users reopen the provider to refresh its list. Document the entry path and this existing host limitation in Chinese and English.
+- Verify against the installed, unmodified Magpie 0.1.1364 in an isolated macOS sandbox using fake credentials.
+
+CHECKS_RUN: missing-entry regression failed before implementation; 48 unit tests passed; real-host prompt API first/last removal, cancellation and duplicate-request checks; Chromium 1100px and WebKit 420px UI removal/cancel/refresh checks; existing manual/browser login, repeat login, quota and 12 gateway cases passed; package dry-run and whitespace checks passed.
+
+CHECKS_NOT_RUN: hosted CI and public-commit installation are post-push checks, tracked in GitHub Actions and the workspace release record; Windows/Linux account management and other host versions (only the available macOS Magpie 0.1.1364 was exercised); removal of real credentials (synthetic fixtures were used); installed-plugin update (publication does not update the running installation).
+
+WHY_NOT: These are prepublication validation results. Live account deletion, gateway restart and Magpie source deployment are outside this plugin release.
+
+EVIDENCE_PATH: `.verification/accounts-red.txt`; `.verification/accounts-tests.txt`; `.verification/accounts-magpie.txt`; `.verification/accounts-ui-final.txt`; `.verification/accounts-package.json`; `output/playwright/accounts-*-confirm.png`; `output/playwright/accounts-*-done.png`.
+
 ## 0.3.3 — 2026-10-24
 
 - Use the official homepage's desktop SSO entry instead of the compact ACM login page, preserving the Token Plan destination and default-browser session import.

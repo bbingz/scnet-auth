@@ -25,6 +25,12 @@ Only the default browser's last-used profile is accessed. Read-only SQL selects 
 
 The official login page collects credentials. The later loopback page only confirms the identity/subscription and collects no phone number, OTP or password. For a different account, switch accounts on SCNet and click the confirmation page's reload button. Identity is rechecked before saving. The listener binds only to `127.0.0.1`, requires a per-attempt capability and exact Origin/Host, rejects cross-site requests, and closes on success, cancellation or a five-minute timeout. Refreshing the confirmation page requires a new attempt. No extension or separate browser is launched.
 
+## Remove a saved account
+
+Version 0.3.4 adds **管理已保存账号（移除旧 KEY）** to the plugin's method picker. Open the SCNet provider, choose **Add another account**, then this management option. Select a record and confirm its removal. Cancel before confirmation changes nothing; after the completion message, Cancel closes management. Reopen the provider to refresh its list.
+
+This flow does not add an account or open a browser. It can remove the first or last saved SCNet account on unmodified Magpie 0.1.1364. Only the selected local key/cookie record is removed; other records, including another slot carrying the same key, and the vendor's key remain intact. Removing the last account makes its models unavailable until another account is added. The original browser sign-in and confirmation flow are unchanged.
+
 ## Advanced manual setup
 
 **手动配置 API Key（高级 / 无桌面环境）** retains account labels, Event/custom models and optional manual Cookie entry for machines without a desktop browser. Browser sign-in is the normal setup path.
