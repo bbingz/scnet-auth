@@ -3,7 +3,7 @@ import { test, afterEach, mock } from "node:test"
 import { SCNetAuthPlugin } from "../index.mjs"
 
 const hooks = await SCNetAuthPlugin()
-const method = hooks.auth.methods[0]
+const method = hooks.auth.methods[1]
 const MODEL = "DeepSeek-V4.1-Flash-1017-Event"
 const auth = (metadata = {}) => ({ type: "api", key: "fixture-key", metadata })
 const row = (extra = {}) => ({ resourceAccountId: "plan-1", name: "DeepSeek 活动套餐", status: "enable", totalAmount: "60000", usedAmount: "1234.5", maxExpireTime: "2099-11-24 23:59:59", ...extra })

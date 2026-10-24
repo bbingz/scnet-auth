@@ -1,12 +1,14 @@
 {
   "name": "scnet-auth",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "超算互联网 SCNet Token Plan for Magpie: 中文配置、账号备注、套餐 Credits 额度查询与流式工具调用。",
   "type": "module",
   "main": "./index.mjs",
   "files": [
     "index.mjs",
     "quota.mjs",
+    "browser-login.mjs",
+    "signin.html",
     "README.md",
     "README.en.md",
     "docs/",
@@ -35,6 +37,9 @@
     "url": "https://github.com/bbingz/scnet-auth/issues"
   },
   "license": "MIT",
+  "dependencies": {
+    "playwright-core": "1.64.1"
+  },
   "engines": {
     "node": ">=22"
   }

@@ -28,14 +28,40 @@ const quote = (value) => "'" + value.replaceAll("'", "'\\''") + "'"
 
 await writeFile(preload, `
 import { appendFileSync } from "node:fs"
+import { EventEmitter } from "node:events"
+import { chromium } from ${JSON.stringify(join(root, "node_modules/playwright-core/index.mjs"))}
+chromium.launch = async () => {
+  const browser = new EventEmitter()
+  browser.newContext = async () => ({
+    cookies: async () => [{ name: "session", value: "scnet-fixture" }],
+    newPage: async () => {
+      let choose
+      return { goto: async () => {}, route: async () => {},
+        exposeFunction: async (_name, fn) => { choose = fn }, setContent: async () => {}, evaluate: async () => {},
+        bringToFront: async () => { await choose("fixture-event", "") } }
+    },
+  })
+  browser.close = async () => browser.emit("disconnected")
+  return browser
+}
 globalThis.fetch = async (input, init) => {
   const req = new Request(input, init)
+  const consoleFixtures = {
+    "/acx/user/users/current-user-info": { id: "fixture-user", userName: "Fixture browser" },
+    "/acx/llm/api-key/token-plan/query": { apiKey: ${JSON.stringify(fixtureKey)} },
+    "/acx/llm/api/package/overview?packageType=TokenPlan": [{ code: "fixture-code", models: "DeepSeek-V4.1-Flash-1017-Event" }],
+  }
+  const path = req.url.replace("https://www.scnet.cn", "")
+  if (Object.hasOwn(consoleFixtures, path)) {
+    if (req.headers.get("cookie") !== "session=scnet-fixture" || req.headers.has("authorization") || req.method !== "GET") throw new Error("Wrong browser console request")
+    return Response.json({ code: "0", data: consoleFixtures[path] })
+  }
   if (req.url === "https://www.scnet.cn/acx/charge/account/currentuser/tokenplan/list") {
     if (req.headers.get("cookie") !== "session=scnet-fixture") throw new Error("Wrong quota cookie")
     if (req.headers.has("authorization")) throw new Error("Inference key leaked to console")
     return Response.json({ code: "0", data: [
-      { resourceAccountId: "fixture-event", name: "DeepSeek 活动套餐", status: "enable", totalAmount: "60000", usedAmount: "1234.5", maxExpireTime: "2099-11-24 23:59:59" },
-      { resourceAccountId: "fixture-standard", name: "标准套餐", status: "enable", totalAmount: "240000", usedAmount: "99999", maxExpireTime: "2099-11-24 23:59:59" },
+      { resourceAccountId: "fixture-event", resourceId: "fixture-code", name: "DeepSeek 活动套餐", status: "enable", totalAmount: "60000", usedAmount: "1234.5", maxExpireTime: "2099-11-24 23:59:59" },
+      { resourceAccountId: "fixture-standard", resourceId: "fixture-code", name: "标准套餐", status: "enable", totalAmount: "240000", usedAmount: "99999", maxExpireTime: "2099-11-24 23:59:59" },
     ] })
   }
   if (req.url !== "https://api.scnet.cn/api/llm/v1/chat/completions") throw new Error("Unexpected upstream URL")
@@ -132,7 +158,7 @@ try {
     })])
   } else {
     // Use the actual login command, not a hand-written credential fixture.
-    await cli(["plugin", "login", "scnet-token-plan", "1"], `Fixture main\n1\n2\n${fixtureKey}\n`)
+    await cli(["plugin", "login", "scnet-token-plan", "2"], `Fixture main\n1\n2\n${fixtureKey}\n`)
     const auth = JSON.parse(await readFile(join(env.XDG_CONFIG_HOME, "magpie", "plugin-auth.json"), "utf8"))
     assert.equal(auth["scnet-token-plan"].key, fixtureKey)
     assert.equal(auth["scnet-token-plan"].metadata.email, "超算互联网 · Fixture main")
@@ -183,7 +209,7 @@ try {
       assert.ok(request.body.tools.some((tool) => tool.function.name === "weather"))
     }
     // Exercise dynamic subscription selection and same-name metadata replacement.
-    await cli(["plugin", "login", "scnet-token-plan", "1"], `Fixture main\n1\n1\nsession=scnet-fixture\n1\n${fixtureKey}\n`)
+    await cli(["plugin", "login", "scnet-token-plan", "2"], `Fixture main\n1\n1\nsession=scnet-fixture\n1\n${fixtureKey}\n`)
     const updated = JSON.parse(await readFile(join(env.XDG_CONFIG_HOME, "magpie", "plugin-auth.json"), "utf8"))
     assert.equal(Object.keys(updated).length, 1)
     assert.equal(updated["scnet-token-plan"].metadata.email, "超算互联网 · Fixture main")
@@ -191,8 +217,17 @@ try {
     const quota = await cli(["quota"])
     assert.match(quota, /58,765.5|58765.5/)
     assert.match(quota, /Credits/)
+    await cli(["plugin", "login", "scnet-token-plan", "1"])
+    await cli(["plugin", "login", "scnet-token-plan", "1"])
+    const browserAuth = JSON.parse(await readFile(join(env.XDG_CONFIG_HOME, "magpie", "plugin-auth.json"), "utf8"))
+    assert.equal(Object.keys(browserAuth).length, 2, "Repeated browser login updates its identity and preserves the manual account")
+    const signedIn = Object.values(browserAuth).find(a => a.metadata?.scnetUserId === "fixture-user")
+    assert.equal(signedIn.key, fixtureKey)
+    assert.equal(signedIn.metadata.quotaPlan, "fixture-event")
+    assert.equal(signedIn.metadata.consoleCookie, "session=scnet-fixture")
+    assert.match(await cli(["quota"]), /Fixture browser/)
     await cli(["plugin", "logout", "scnet-token-plan"])
-    console.log("PASS plugin add/list/login/logout; 12 gateway cases; account naming; selected-plan quota")
+    console.log("PASS plugin add/list/login/logout; 12 gateway cases; manual and browser sign-in; repeat login; account naming; selected-plan quota")
   }
 } catch (error) {
   console.error(JSON.stringify(logs, null, 2))

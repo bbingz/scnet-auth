@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; form-action 'none'; base-uri 'none'">
+<title>超算互联网 · 连接到 Magpie</title>
+<style>
+  :root { font-family: system-ui, sans-serif; color: #172033; background: #f3f6fb; color-scheme: light; }
+  body { margin: 0; padding: 48px 20px; }
+  main { max-width: 520px; margin: 0 auto; padding: 32px; background: white; border: 1px solid #dce4ef; border-radius: 20px; }
+  .brand { color: #1259c3; font-weight: 650; } h1 { font-size: 25px; margin: 14px 0; }
+  p { line-height: 1.7; color: #536078; } label { display: block; font-weight: 600; margin: 24px 0 8px; }
+  select, input, button { box-sizing: border-box; width: 100%; font: inherit; border-radius: 9px; padding: 12px; }
+  select, input { border: 1px solid #b9c7db; background: white; } button { border: 0; background: #1259c3; color: white; font-weight: 600; margin-top: 26px; cursor: pointer; }
+  button:disabled { opacity: .6; cursor: wait; } :focus-visible { outline: 3px solid #78b5ff; outline-offset: 3px; }
+  #error { color: #ad2525; } .note { font-size: 13px; } [hidden] { display: none; }
+</style>
+<main>
+  <div class="brand">超算互联网 × Magpie</div>
+  <h1>确认连接的套餐</h1>
+  <p id="account"></p>
+  <p>账号、现有 API Key 和剩余额度将保存到本机 Magpie。登录密码和验证码不会交给插件。</p>
+  <form id="connect">
+    <label for="plan">Token Plan 套餐</label>
+    <select id="plan" required></select>
+    <p id="detail" class="note"></p>
+    <div id="custom" hidden><label for="models">套餐模型 ID</label><input id="models" placeholder="从套餐页面复制完整模型 ID，多个用逗号分隔"><p class="note">此套餐未返回模型列表，请填写后连接。</p></div>
+    <p id="error" role="alert"></p>
+    <button id="submit" type="submit">连接到 Magpie</button>
+  </form>
+  <p class="note">仅连接所选套餐。关闭此窗口可取消。</p>
+</main>
+<script>
+  let choices = [];
+  const byId = id => document.getElementById(id);
+  window.scnetShow = data => {
+    choices = data.choices;
+    byId('account').textContent = '已登录：' + data.user;
+    for (const plan of choices) { const option = document.createElement('option'); option.value = plan.id; option.textContent = plan.name + (choices.length > 1 ? ' · ' + plan.id : ''); byId('plan').append(option); }
+    byId('plan').dispatchEvent(new Event('change'));
+  };
+  byId('plan').addEventListener('change', () => {
+    const plan = choices.find(p => p.id === byId('plan').value);
+    byId('custom').hidden = !!plan.models;
+    byId('models').required = !plan.models;
+    byId('detail').textContent = (plan.until ? '到期：' + new Date(plan.until).toLocaleString('zh-CN') + '。' : '') + (plan.models ? '模型：' + plan.models.split(',').join('、') : '');
+    byId('error').textContent = '';
+  });
+  byId('connect').addEventListener('submit', async event => {
+    event.preventDefault(); byId('submit').disabled = true;
+    try { const result = await window.scnetChoose(byId('plan').value, byId('models').value); byId('error').textContent = result.error || ''; if (!result.ok) byId('submit').disabled = false; }
+    catch { byId('error').textContent = '连接已结束，请返回 Magpie 查看结果。'; }
+  });
+</script>
+</html>

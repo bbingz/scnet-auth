@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.3.0 — 2026-10-24
+
+- Make browser sign-in the default: open SCNet's official login page in an isolated installed Chrome/Edge browser, then read the user's identity, existing Token Plan key and subscriptions. Confirm the subscription in a Chinese page before returning credentials to Magpie. Passwords and verification codes remain on the official page; no manual Cookie/API-key copying is required.
+- Resolve models only through the subscription's matching package code. Ask for exact IDs when discovery is unavailable. Preserve multiple accounts, legacy credentials and the advanced manual method; repeated browser sign-in updates its matching identity. Duplicate subscription names remain distinguishable.
+- Scope session capture to the new context and SCNet console origin. Close the temporary browser on success, cancellation or timeout. Refuse missing/masked keys, never create/reset keys or buy subscriptions, and keep credentials out of the confirmation page and error messages. Add pinned playwright-core, with no browser download.
+- Update Chinese and English setup/upgrade instructions, actionable quota errors, endpoint evidence, unit coverage and the isolated Magpie integration harness.
+
+CHECKS_RUN: 31 Node.js unit tests, including the original failing default-login reproduction; actual Magpie CLI manual/browser callback storage and repeat-login checks; selected-plan quota; twelve mocked gateway protocol cases; actual Chrome confirmation-page visual check and synthetic confirmation click; package dry-run and whitespace checks.
+
+CHECKS_NOT_RUN: real authenticated SCNet browser login and quota, Windows/Linux browser launch, native OpenCode.
+
+WHY_NOT: Real sign-in requires the user's interaction with the official page. Synthetic browser and gateway results do not establish real account balances. Desktop validation used macOS and Chrome.
+
+EVIDENCE_PATH: `test/browser-login.test.mjs`; `scripts/test-magpie.mjs`; `docs/quota-api.md`; local-only `.verification/tests-0.3.0.txt` and `.verification/magpie-0.3.0.txt`.
+
 ## 0.2.0 — 2026-10-24
 
 - Add a Chinese setup wizard with account labels, Event/custom model selection, Chinese comma support and optional console-backed quota. Provider/account labels include 超算互联网 and an embedded icon identifies the provider. Same-label sign-in updates that account; distinct accounts require distinct labels.

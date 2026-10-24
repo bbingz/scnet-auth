@@ -64,7 +64,7 @@ export async function usage(getAuth) {
   // A console failure must never mark a valid inference key as signed out.
   const base = { user: md.email || "", signIn: "kept" }
   if (auth?.type !== "api" || md.quota !== "console" || !md.consoleCookie || !md.quotaPlan) {
-    return { ...base, error: "未连接控制台额度 · 重新登录可启用查询" }
+    return { ...base, error: "未连接账号额度 · 请使用“浏览器登录超算互联网”" }
   }
   try {
     const matches = (await plans(md.consoleCookie)).filter(row => planId(row) === md.quotaPlan)

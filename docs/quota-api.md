@@ -17,4 +17,17 @@ Remaining Credits are `max(total - used, 0)`. Usage may exceed 100%. No price ta
 
 The optional console cookie is separate from the inference key. Quota requests have a fixed HTTPS origin/path, a ten-second deadline and `redirect: "error"`; they never carry the inference Authorization header. Upstream error bodies and network exception text are not shown or logged. Quota results use Magpie's `signIn: "kept"` to avoid clearing or expiring an unrelated inference authentication state.
 
-Verified locally: unit fixtures, real Magpie CLI login and quota rendering, and a real browser configuration flow against mocked SCNet responses. **Not verified:** a real authenticated subscription response, cookie lifetime, or live paid inference. The fixture screenshot in this repository is labeled as synthetic data. Session cookies must never be supplied in public issues or logs.
+## Browser sign-in in 0.3.0
+
+The default Magpie OAuth-style method opens an isolated installed Chrome/Edge window using `playwright-core`. This is a browser-session integration, not a claim that SCNet publishes an OAuth client registration or device authorization API. Passwords, SMS and CAPTCHA remain in the official website. Only cookies applicable to `https://www.scnet.cn/acx/` in this newly created context are read; existing browser profiles are not accessed. The browser closes on completion, cancellation or a five-minute deadline.
+
+Current SCNet sources checked on 2026-10-24:
+
+- Login entry: `https://www.scnet.cn/ui/acm/index.html`; route `/login` in `assets/index-BUxD3tNN.js`, with the official login component `assets/Login-Q7uT9Ak0.js`.
+- `GET /acx/user/users/current-user-info`: current user ID and `userName`, declared in the console app bundle.
+- `GET /acx/llm/api-key/token-plan/query`: read the existing Token Plan key. The declaration and response alternatives are in `68.c5b19b0a.js`; `2938.13931614.js` invokes it for the subscription page. The plugin never calls the separate create/reset endpoints.
+- `GET /acx/llm/api/package/overview?packageType=TokenPlan`, optionally with `code`: resolve each subscription's `resourceId` to exactly the matching package `code` and its `models`. An anonymous read returned the expected catalog envelope. Unmatched models require user input; an unrelated catalog row is never selected.
+
+The offline confirmation page receives only the display name, plan choices, expiry and model IDs. It never receives the Cookie or key. Only after the user confirms a listed subscription does the callback return an API credential plus session metadata to Magpie's normal credential storage. Legacy/manual accounts are preserved; the host updates an existing matching browser identity on repeated sign-in. The API-key method remains an advanced fallback.
+
+Verified locally: 31 unit tests; real Magpie CLI manual and browser callback/storage integration, repeated sign-in and quota rendering; twelve mocked gateway protocol cases; a real Chrome confirmation page clicked through using synthetic data. **Not verified:** real authenticated browser sign-in, subscription response or cookie lifetime. A bounded live inference request passed on the earlier API-key version; it does not validate the new browser flow. Session cookies must never be supplied in public issues or logs.

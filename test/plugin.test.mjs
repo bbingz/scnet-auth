@@ -12,7 +12,8 @@ afterEach(() => mock.restoreAll())
 test("entry exposes one plugin with an API key login and preserves configured providers", async () => {
   assert.equal(Object.values(entry).filter((v) => typeof v === "function").length, 1)
   assert.equal(hooks.auth.provider, ID)
-  assert.equal(hooks.auth.methods[0].type, "api")
+  assert.equal(hooks.auth.methods[0].type, "oauth")
+  assert.equal(hooks.auth.methods[1].type, "api")
   const config = {}
   await hooks.config(config)
   assert.equal(config.provider[ID].api, "https://api.scnet.cn/api/llm/v1")
@@ -43,7 +44,7 @@ test("configured model limits survive account model selection", async () => {
 })
 
 test("model prompt rejects malformed IDs and keeps the exact Event suffix", () => {
-  const validate = hooks.auth.methods[0].prompts.find(p => p.key === "models").validate
+  const validate = hooks.auth.methods[1].prompts.find(p => p.key === "models").validate
   for (const value of [MODEL, "GLM-5.3,Kimi-K3"]) assert.equal(validate(value), undefined)
   for (const value of ["a,,b", ",", "two words", "../bad", ["a"]]) assert.match(validate(value), /模型|Model IDs|exact SCNet/)
 })

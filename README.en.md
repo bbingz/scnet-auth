@@ -2,7 +2,7 @@
 
 [简体中文](README.md)
 
-An independent MIT-licensed plugin connecting your own SCNet Token Plan to Magpie. Version 0.2.0 adds a Chinese setup wizard, recognizable account names, an embedded provider icon, and optional console-backed Credits usage. No runtime dependencies or build step.
+An independent MIT-licensed plugin connecting your own SCNet Token Plan to Magpie. Version 0.3.0 defaults to browser sign-in, automatically importing account identity, an existing Token Plan key, subscription models and a session for Credits usage. It uses pinned `playwright-core` with an installed Chrome/Edge browser; no browser download or build step.
 
 ![Account and quota in real Magpie](docs/account-quota.png)
 
@@ -17,11 +17,17 @@ magpie plugin add github:bbingz/scnet-auth
 magpie plugin login scnet-token-plan
 ```
 
-The Chinese wizard asks for an account label, Event/custom models, optional quota connection, and a masked dedicated Token Plan key. Labels become `超算互联网 · <label>`. Use distinct labels for distinct accounts: Magpie replaces an existing account with the same label. Reuse the original label when updating models or the console session; use Magpie's account-name editor to change its display name.
+Choose **浏览器登录超算互联网（推荐）**. Complete sign-in on the official SCNet website in the isolated browser window, then select your subscription and confirm **连接到 Magpie**. No developer tools, Cookie copying, or API key entry is needed. Passwords and verification codes remain on the official site. The plugin reads an existing key; it never creates/resets keys or purchases plans.
 
-The Event preset uses the exact ID `DeepSeek-V4.1-Flash-1017-Event`. Custom model IDs support English/Chinese commas and line breaks. Copy IDs from your plan console; the public model catalog does not establish account entitlements. Existing model limits are preserved; unspecified limits remain zero.
+The plugin reads only its fresh temporary browser context, never your existing browser profile. It closes that browser after confirmation, cancellation or a five-minute deadline. Install Chrome or Edge first; an existing Playwright Chromium is also supported. Headless/remote hosts can use the advanced manual API-key method.
 
-Update `scnet-auth` in Magpie's Plugins page. If the app keeps old code loaded, toggle this plugin off and on when idle. Accounts created by 0.1.0 still work but have no label/session metadata: add a named account with this wizard, verify its models, then remove the old anonymous `API key …` account.
+Subscription `resourceId` is matched to its package code for exact model IDs. If discovery cannot establish the models, the confirmation page asks for them. Public catalog entries alone do not establish account entitlement.
+
+Update the plugin to 0.3.0, then sign in through the browser. Old anonymous/manual accounts remain intact; verify the new account before signing the old one out. Repeated browser sign-in for the same username and subscription updates that browser account. Session expiry requires another browser sign-in and does not invalidate a working inference key.
+
+## Advanced manual setup
+
+**手动配置 API Key（高级 / 无桌面环境）** retains account labels, Event/custom models and optional manual Cookie entry for machines without a desktop browser. Browser sign-in is the normal setup path.
 
 ## Optional Credits usage
 
@@ -35,7 +41,7 @@ In your browser, sign in to the [Token Plan console](https://www.scnet.cn/ui/con
 
 Cookies are login credentials. Keep them out of issues, chat and screenshots. The plugin stores the cookie only in the account's Magpie credential metadata and sends it only to the fixed HTTPS console endpoint, with redirects disabled and a ten-second timeout. It is never sent to inference. Select “暂不查询额度” on a same-label sign-in to clear it.
 
-Usage reports remaining Credits, consumed/total Credits, percentage and reported expiry. Reset time is reported only when supplied. Credits are not tokens; no local token-count estimate is used. Missing sessions, expired cookies, incomplete responses and network failures produce actionable Chinese messages and never mark inference credentials as expired. This internal console API may change. Real authenticated quota and paid inference have not been acceptance-tested; automated tests use synthetic data grounded in the current console schema.
+Usage reports remaining Credits, consumed/total Credits, percentage and reported expiry. Reset time is reported only when supplied. Credits are not tokens; no local token-count estimate is used. Missing sessions, expired cookies, incomplete responses and network failures produce actionable Chinese messages and never mark inference credentials as expired. This internal console API may change. The earlier API-key version passed a bounded live inference request; the new browser sign-in and real authenticated quota still require separate acceptance; automated tests use synthetic data grounded in the current console schema.
 
 ## Requests and storage
 
@@ -50,6 +56,7 @@ Usage reports remaining Credits, consumed/total Credits, percentage and reported
 ## Development
 
 ```sh
+npm ci --ignore-scripts
 npm test
 npm pack --dry-run --ignore-scripts
 # macOS only, with Magpie and Bun installed:

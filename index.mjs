@@ -1,4 +1,5 @@
 import { cookieError, date, planId, planName, plans, usage } from "./quota.mjs"
+import { startBrowserLogin } from "./browser-login.mjs"
 
 const ID = "scnet-token-plan"
 const BASE = "https://api.scnet.cn/api/llm/v1"
@@ -61,7 +62,7 @@ export async function SCNetAuthPlugin() {
       provider: ID,
       // A self-contained mark also works when the app cannot reach image hosts.
       icon: "data:image/svg+xml;base64," + Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#1259c3"/><path d="M18 19h28v8H26v5h20v13H18v-8h20v-5H18z" fill="white"/></svg>').toString("base64"),
-      methods: [signInMethod()],
+      methods: [{ type: "oauth", label: "浏览器登录超算互联网（推荐）", authorize: () => startBrowserLogin() }, signInMethod()],
       usage,
       async loader(getAuth) {
         requireKey(await getAuth())
@@ -141,7 +142,7 @@ function signInMethod() {
     },
   ]
   return {
-    type: "api", label: "超算互联网 Token Plan 专用 API Key",
+    type: "api", label: "手动配置 API Key（高级 / 无桌面环境）",
     placeholder: "粘贴此套餐的专用 Key（非按量付费 Key）", prompts,
     async ask(inputs = {}) {
       for (const p of prompts) {

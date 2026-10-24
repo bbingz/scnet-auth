@@ -1,12 +1,12 @@
 # 超算互联网 · SCNet Token Plan
 
-[English](README.en.md) · [安装 / 更新](#安装与更新) · [连接额度查询](#连接额度查询) · [常见问题](#常见问题)
+[English](README.en.md) · [安装 / 更新](#安装与更新) · [浏览器登录](#浏览器登录推荐) · [常见问题](#常见问题)
 
-为 [Magpie](https://usemagpie.ai) 接入超算互联网 Token Plan 的开源插件。使用你自己的套餐专用 API Key，支持多账号、活动套餐、自定义模型、流式输出及工具调用。MIT 许可，独立社区项目。
+为 [Magpie](https://usemagpie.ai) 接入超算互联网 Token Plan 的开源插件。通过浏览器登录，自动获取账号、现有套餐密钥和额度，支持多账号、活动套餐、自定义模型、流式输出及工具调用。MIT 许可，独立社区项目。
 
 ## 配置后的效果
 
-账号显示为 **超算互联网 · 你的账号备注**，带独立图标。连接控制台会话后，账号下显示剩余 Credits、已用量和额度进度；套餐到期时间也会交给 Magpie。
+浏览器登录后，账号显示为 **超算互联网 · 用户名 · 套餐**，带独立图标。账号下显示剩余 Credits、已用量和额度进度；套餐到期时间也会交给 Magpie。
 
 ![Magpie 中的中文账号与额度](docs/account-quota.png)
 
@@ -21,11 +21,24 @@ magpie plugin add github:bbingz/scnet-auth
 magpie plugin login scnet-token-plan
 ```
 
-更新已有安装：在 Magpie 的插件页检查更新并更新 `scnet-auth`。新版本为 **0.2.0**。如应用仍使用旧插件代码，在空闲时将此插件关闭再开启。
+更新已有安装：在 Magpie 的插件页检查更新并更新 `scnet-auth`。新版本为 **0.3.0**。如应用仍使用旧插件代码，在空闲时将此插件关闭再开启。
 
-**从 0.1.0 升级：** 已有模型仍可使用。旧账号没有备注和额度会话，需要按下面的向导重新添加具名账号，核对模型后再移除旧的 `API key …` 账号。新版账号补充额度或修改模型时，使用**原来的备注**重新登录；Magpie 会更新同名账号。多个账号必须使用不同备注，修改显示名称可使用 Magpie 账号名称的编辑功能。
+**从 0.1.x / 0.2.x 升级：** 原账号仍可使用。更新插件后，添加账号并选择下面的浏览器登录。旧匿名/手动账号不会被自动删除；确认新账号的模型与额度后，可在 Magpie 中退出旧账号。再次用同一 SCNet 用户及套餐登录会更新对应的浏览器账号。
 
-## 中文配置向导
+## 浏览器登录（推荐）
+
+1. 在 **供应商 → 超算互联网 · SCNet Token Plan → 添加另一个账号**，或运行上面的登录命令，选择 **浏览器登录超算互联网（推荐）**。
+2. 插件打开一个独立的 Chrome / Edge 窗口，在 **SCNet 官方登录页**完成登录。密码、短信验证码及图形验证都由官网处理。
+3. 登录后自动读取用户名、可用套餐和现有 Token Plan 密钥。在“连接到 Magpie”页面确认套餐，再点击 **连接到 Magpie**。不需要打开开发者工具或复制 Cookie / API Key。
+4. 返回 Magpie 查看账号名称、模型和 Credits 额度。多个套餐分别连接，额度按所选套餐展示。
+
+模型列表只使用该订阅的 `resourceId` 所匹配套餐；若接口未提供准确模型列表，确认页才会要求填写。不会把公共模型目录当作套餐权限。插件只读取现有密钥，不会创建、重置密钥或购买套餐；没有可用套餐/完整密钥时会明确提示。
+
+需要本机已安装 **Chrome 或 Edge**（也支持 Playwright 已安装的 Chromium），不会自动下载浏览器。每次登录使用独立临时会话，不读取你日常浏览器的账号或 Cookie。确认、取消或五分钟超时后关闭该独立窗口。会话过期时重新选择浏览器登录即可；模型密钥保持可用时，额度查询失败不会中断模型调用。无桌面环境可使用下面的高级手动方式。
+
+## 手动配置（高级 / 无桌面环境）
+
+选择 **手动配置 API Key（高级 / 无桌面环境）** 后进入下面的中文向导。
 
 在 **供应商 → 添加供应商 → 来自插件 → 超算互联网 · SCNet Token Plan** 中配置，或使用上面的登录命令。
 
@@ -60,7 +73,7 @@ Cookie 是登录凭据，请仅粘贴到本机 Magpie 的配置框，不要发�
 
 查询结果包含剩余 Credits、已用 / 总额、使用百分比及返回的到期时间。SCNet 返回明确的重置时间时才显示重置，不假设自动续订。**Credits 不等于 token 数量**，也不由 Magpie 的本地 token 统计估算。
 
-未连接时显示“未连接控制台额度 · 重新登录可启用查询”。Cookie 过期、网络失败或套餐数据不完整时会显示具体原因，不伪造余额、不把模型 API Key 标记为失效。重新登录时使用原账号备注，更新 Cookie 并再次选择套餐即可。
+未连接时提示使用“浏览器登录超算互联网”。Cookie 过期、网络失败或套餐数据不完整时会显示具体原因，不伪造余额、不把模型 API Key 标记为失效。重新登录时使用原账号备注，更新 Cookie 并再次选择套餐即可。
 
 套餐和模型由你按控制台选择；插件不能用控制台 Cookie 自动证明该套餐与某个 API Key 属于同一账号。
 
@@ -68,7 +81,7 @@ Cookie 是登录凭据，请仅粘贴到本机 Magpie 的配置框，不要发�
 
 **仍显示 `API key …` 或“剩余额度未知”？**
 
-先确认插件版本为 0.2.0，并按升级步骤配置具名账号。旧账号没有新增的备注、Cookie 和套餐选择信息。没有连接额度查询时仍可正常使用模型。
+先确认插件版本为 0.3.0，再选择浏览器登录完成账号连接。旧账号没有新增的备注、Cookie 和套餐选择信息。没有连接额度查询时仍可正常使用模型。
 
 **登录后请求 401 / 403 / 429？**
 
@@ -101,11 +114,12 @@ magpie plugin rm github:bbingz/scnet-auth
 | 额度地址 | `https://www.scnet.cn/acx/charge/account/currentuser/tokenplan/list` |
 | 凭据位置 | `$XDG_CONFIG_HOME/magpie/plugin-auth.json`，默认 `~/.config/magpie/plugin-auth.json` |
 
-插件使用 Magpie 的 OpenCode 插件接口。上游使用 Chat Completions，由 Magpie 转换 OpenAI Chat、Responses 和 Anthropic Messages；无需为每种协议重复添加模型。运行时无第三方依赖、无需构建。主要面向 Magpie，动态套餐向导及密码提示为 Magpie 扩展，未验证原生 OpenCode。
+插件使用 Magpie 的 OpenCode 插件接口。上游使用 Chat Completions，由 Magpie 转换 OpenAI Chat、Responses 和 Anthropic Messages；无需为每种协议重复添加模型。浏览器登录使用固定版本的 `playwright-core`，无需构建；依赖本身不下载浏览器。主要面向 Magpie，动态套餐向导及密码提示为 Magpie 扩展，未验证原生 OpenCode。
 
 ## 开发与验证
 
 ```sh
+npm ci --ignore-scripts
 npm test
 npm pack --dry-run --ignore-scripts
 # macOS，安装 Magpie 与 Bun 后：
@@ -114,7 +128,7 @@ SCNET_TEST_BUN=/absolute/path/to/bun npm run test:magpie
 SCNET_TEST_UI=1 SCNET_TEST_BUN=/absolute/path/to/bun npm run test:magpie
 ```
 
-单元测试覆盖账号名称、条件向导、模型列表、额度解析及失败处理、密钥隔离、流式工具调用、注销及取消。集成测试覆盖真实 CLI 安装 / 登录 / 套餐选择 / 额度显示，以及三种协议的 JSON/SSE 和文本/工具调用。测试使用临时目录、假凭据和 macOS 沙箱，不读取或修改现有账号。真实 SCNet 付费推理及登录态余额尚未验收。
+单元测试覆盖账号名称、条件向导、模型列表、额度解析及失败处理、密钥隔离、流式工具调用、注销及取消。集成测试覆盖真实 CLI 安装 / 登录 / 套餐选择 / 额度显示，以及三种协议的 JSON/SSE 和文本/工具调用。测试使用临时目录、假凭据和 macOS 沙箱，不读取或修改现有账号。真实账号曾通过旧版完成一次推理；新版浏览器登录及真实余额仍需单独验收，模拟结果不代表真实余额。
 
 ## 参考
 
