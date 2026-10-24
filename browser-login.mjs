@@ -194,7 +194,7 @@ export async function startBrowserLogin({ timeoutMs = 300000, pollMs = 2500, bro
       if (!ended) finish({ type: "failed", error: error instanceof LoginError ? error.message : "读取官网登录结果失败，请重新登录" })
     }
   }
-  return { url: "https://www.scnet.cn/ui/acm/index.html#/login?redirect=" + encodeURIComponent("https://www.scnet.cn/ui/console/index.html#/llm/token-plan"),
+  return { url: "https://www.scnet.cn/ac/api/auth/loginSsoRedirect.action?originalUrl=" + encodeURIComponent("https://www.scnet.cn/ui/console/index.html#/llm/token-plan"),
     opened: false, method: "auto",
     instructions: `请在 ${browser.name} 的官网页面登录。插件仅只读获取此浏览器当前资料（${browser.profile || "当前资料"}）中 scnet.cn 的会话；macOS 如弹出钥匙串提示，请允许本次读取。登录后自动打开账号及套餐确认页，无需复制 Cookie 或安装扩展。五分钟内有效。`,
     callback() { if (!started && !ended) { started = true; void watch() }; return result },

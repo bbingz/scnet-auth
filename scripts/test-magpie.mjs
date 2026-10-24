@@ -143,7 +143,7 @@ async function cli(args, input = "") {
   const collect = data => {
     output += data
     if (args.join(" ") !== "plugin login scnet-token-plan 1" || interaction) return
-    if (!output.includes("https://www.scnet.cn/ui/acm/index.html")) return
+    if (!output.includes("https://www.scnet.cn/ac/api/auth/loginSsoRedirect.action")) return
     interaction = (async () => {
       let address
       const until = Date.now() + 15000

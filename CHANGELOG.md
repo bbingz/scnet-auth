@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.3 — 2026-10-24
+
+- Use the official homepage's desktop SSO entry instead of the compact ACM login page, preserving the Token Plan destination and default-browser session import.
+- Update the public GitHub repository description with 超算互联网 and SCNet. Magpie's GitHub discovery searches this description, not the package description; document its roughly ten-minute list cache.
+- Correct the Chinese browser-login documentation anchor. Validate the desktop URL and destination with an initially failing regression, 45 passing tests, the real isolated Magpie integration and an anonymous browser rendering of the official desktop login page.
+
 ## 0.3.2 — 2026-10-24
 
 - Open SCNet's official login page in the default browser. Replace the rejected local SMS form with read-only import of that browser's SCNet session on macOS; retain only a post-login account/subscription confirmation page. Remove the SMS module and its endpoints.

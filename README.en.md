@@ -2,7 +2,7 @@
 
 [简体中文](README.md)
 
-An independent MIT-licensed plugin connecting your own SCNet Token Plan to Magpie. Version 0.3.2 defaults to browser sign-in, automatically importing account identity, an existing Token Plan key, subscription models and a session for Credits usage. It uses Node.js built-ins and the default browser; no extension, Playwright, browser download or build step.
+An independent MIT-licensed plugin connecting your own SCNet Token Plan to Magpie. Version 0.3.3 defaults to browser sign-in, automatically importing account identity, an existing Token Plan key, subscription models and a session for Credits usage. It uses Node.js built-ins and the default browser; no extension, Playwright, browser download or build step.
 
 ![Account and quota in real Magpie](docs/account-quota.png)
 
@@ -10,14 +10,14 @@ An independent MIT-licensed plugin connecting your own SCNet Token Plan to Magpi
 
 ## Installation and setup
 
-Search **scnet** in Magpie's Plugins discovery. This is the **Unofficial, on GitHub** section, not a maintainer-reviewed registry listing. Direct installation:
+Search **scnet**, **超算** or **超算互联网** in Magpie's Plugins discovery. This is the **Unofficial, on GitHub** section, not a maintainer-reviewed registry listing. Magpie caches the GitHub list for about ten minutes; reopen discovery afterward if an old description remains. Direct installation:
 
 ```sh
 magpie plugin add github:bbingz/scnet-auth
 magpie plugin login scnet-token-plan
 ```
 
-Choose **浏览器登录超算互联网（macOS 官网）**. Magpie opens SCNet's official login page in the default browser. Sign in normally, or use its existing website session. If macOS asks for browser Keychain access, allow this attempt. A local confirmation page then shows the account and subscriptions; only confirmation saves the existing Token Plan key and quota session. The plugin never creates/resets keys or purchases plans.
+Choose **浏览器登录超算互联网（macOS 官网）**. Magpie opens SCNet's official desktop login page in the default browser. Sign in normally, or use its existing website session. If macOS asks for browser Keychain access, allow this attempt. A local confirmation page then shows the account and subscriptions; only confirmation saves the existing Token Plan key and quota session. The plugin never creates/resets keys or purchases plans.
 
 Automatic import currently supports macOS Chrome (stable/Beta/Dev/Canary), Edge and Brave. Real account/key/model/quota reads were verified with Chrome Beta; other supported browser mappings have not had live-account acceptance. Safari, Windows, Linux and headless environments use the advanced manual method. Private/incognito browser sessions are not supported.
 
