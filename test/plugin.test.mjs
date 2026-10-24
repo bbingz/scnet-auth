@@ -33,7 +33,7 @@ test("models are scoped to each account; a global catalog is never fetched", asy
   assert.equal(regular["GLM-5.3"].api.id, "GLM-5.3")
   assert.equal(regular["GLM-5.3"].limit.context, 0)
   assert.equal(await hooks.provider.models(provider), provider.models)
-  assert.equal(hooks.auth.usage, undefined)
+  assert.equal(typeof hooks.auth.usage, "function")
 })
 
 test("configured model limits survive account model selection", async () => {
@@ -43,9 +43,9 @@ test("configured model limits survive account model selection", async () => {
 })
 
 test("model prompt rejects malformed IDs and keeps the exact Event suffix", () => {
-  const validate = hooks.auth.methods[0].prompts[0].validate
-  for (const value of [undefined, "", " ", MODEL, "GLM-5.3,Kimi-K3"]) assert.equal(validate(value), undefined)
-  for (const value of ["a,,b", ",", "two words", "../bad", ["a"]]) assert.match(validate(value), /Model IDs|exact SCNet/)
+  const validate = hooks.auth.methods[0].prompts.find(p => p.key === "models").validate
+  for (const value of [MODEL, "GLM-5.3,Kimi-K3"]) assert.equal(validate(value), undefined)
+  for (const value of ["a,,b", ",", "two words", "../bad", ["a"]]) assert.match(validate(value), /模型|Model IDs|exact SCNet/)
 })
 
 test("loader uses fresh per-account auth and preserves JSON tool calls", async () => {

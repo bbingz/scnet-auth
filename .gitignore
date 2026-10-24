@@ -2,3 +2,5 @@ node_modules/
 *.tgz
 .verification/
 .DS_Store
+output/
+.playwright-cli/
