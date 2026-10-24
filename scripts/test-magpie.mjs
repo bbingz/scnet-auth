@@ -27,28 +27,19 @@ const requests = join(sandbox, "requests.jsonl")
 const quote = (value) => "'" + value.replaceAll("'", "'\\''") + "'"
 
 await writeFile(preload, `
-import { appendFileSync, existsSync } from "node:fs"
-import { EventEmitter } from "node:events"
-import { createRequire } from "node:module"
-const installedPackage = ${JSON.stringify(join(sandbox, "config/magpie/plugins/node_modules/scnet-auth/package.json"))}
-const requirePlugin = createRequire(existsSync(installedPackage) ? installedPackage : ${JSON.stringify(join(root, "package.json"))})
-const { chromium } = requirePlugin("playwright-core")
-chromium.launch = async () => {
-  const browser = new EventEmitter()
-  browser.newContext = async () => ({
-    cookies: async () => [{ name: "session", value: "scnet-fixture" }],
-    newPage: async () => {
-      let choose
-      return { goto: async () => {}, route: async () => {},
-        exposeFunction: async (_name, fn) => { choose = fn }, setContent: async () => {}, evaluate: async () => {},
-        bringToFront: async () => { await choose("fixture-event", "") } }
-    },
-  })
-  browser.close = async () => browser.emit("disconnected")
-  return browser
-}
+import { appendFileSync } from "node:fs"
+const nativeFetch = globalThis.fetch
 globalThis.fetch = async (input, init) => {
   const req = new Request(input, init)
+  if (new URL(req.url).hostname === "127.0.0.1") return nativeFetch(input, init)
+  if (req.url === "https://www.scnet.cn/ac/api/auth/sendDesktopClientPhoneCode.action") {
+    if ((await req.formData()).get("phoneNum") !== "+8613800000000") throw new Error("Wrong fixture phone")
+    return Response.json({ code: "0" }, { headers: { "set-cookie": "session=challenge; Path=/; Secure; HttpOnly" } })
+  }
+  if (req.url === "https://www.scnet.cn/ac/api/auth/loginDesktopClientByPhoneCode.action") {
+    if ((await req.formData()).get("messageCode") !== "123456" || req.headers.get("cookie") !== "session=challenge") throw new Error("Wrong SMS fixture session")
+    return Response.json({ code: "0" }, { headers: { "set-cookie": "session=scnet-fixture; Path=/; Secure; HttpOnly" } })
+  }
   const consoleFixtures = {
     "/acx/user/users/current-user-info": { id: "fixture-user", userName: "Fixture browser" },
     "/acx/llm/api-key/token-plan/query": { apiKey: ${JSON.stringify(fixtureKey)} },
@@ -122,14 +113,36 @@ const launch = (args, stdio) => spawn("/usr/bin/sandbox-exec", ["-p", sandboxPro
 const logs = []
 async function cli(args, input = "") {
   const child = launch(args, ["pipe", "pipe", "pipe"])
-  let output = ""
-  child.stdout.on("data", (data) => { output += data })
-  child.stderr.on("data", (data) => { output += data })
+  let output = "", interaction, interactionError
+  const collect = data => {
+    output += data
+    if (args.join(" ") !== "plugin login scnet-token-plan 1" || interaction) return
+    const match = output.match(/http:\/\/127\.0\.0\.1:\d+\/#[-\w]+/)
+    if (!match) return
+    interaction = (async () => {
+      const url = new URL(match[0])
+      const post = async (path, body) => {
+        const response = await fetch(url.origin + path, { method: "POST", headers: {
+          "content-type": "application/json", origin: url.origin, "x-scnet-login": url.hash.slice(1),
+        }, body: JSON.stringify(body) })
+        assert.equal(response.status, 200)
+        return response.json()
+      }
+      await post("/send-code", { phone: "13800000000" })
+      const data = await post("/login", { code: "123456" })
+      assert.equal(data.user, "Fixture browser")
+      await post("/choose", { id: "fixture-event" })
+    })().catch(error => { interactionError = error; child.kill("SIGKILL") })
+  }
+  child.stdout.on("data", collect)
+  child.stderr.on("data", collect)
   child.stdin.on("error", () => {})
   child.stdin.end(input)
   const timer = setTimeout(() => child.kill("SIGKILL"), 45000)
   try {
     const code = await new Promise((done, reject) => { child.once("error", reject); child.once("close", done) })
+    await interaction
+    if (interactionError) throw interactionError
     logs.push({ args, code, output })
     assert.equal(code, 0, `magpie ${args.join(" ")}: ${output}`)
     return output

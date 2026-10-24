@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.3.1 — 2026-10-24
+
+- Replace isolated Chrome/Edge sign-in with Magpie's default-browser opener and a temporary loopback page. Remove the Playwright runtime dependency. No browser extension or password is required.
+- Use the SMS endpoints independently verified in the official SCNet 3.2.1 desktop artifact: request a code only on user action, establish the session, read identity/existing key/subscriptions, and require confirmation before Magpie saves the account. The page clearly identifies itself as a local community-plugin UI; it does not reuse the browser's existing website login. Phone numbers and SMS codes are not persisted or logged.
+- Bind the listener to 127.0.0.1, validate Host/Origin and a random per-attempt capability, bound request bodies, forbid framing/external scripts, scope cookies, throttle SMS sends and abort work on cancellation/timeout. Preserve legacy accounts, exact model matching and selected-plan quota.
+- Update Chinese/English instructions, source evidence and the real Magpie integration harness for the SMS flow.
+
+CHECKS_RUN: 37 unit tests, including the initially failing default-browser regression; isolated Magpie CLI SMS/manual persistence, repeat login, selected-plan quota and twelve mocked gateway protocol cases; actual Chrome SMS/confirmation/success flow with synthetic data and zero console errors/warnings; official desktop source inspection and anonymous missing-parameter checks; package dry-run and whitespace validation.
+
+CHECKS_NOT_RUN: real authenticated SMS sign-in/remaining Credits, Windows/Linux browser opening, native OpenCode.
+
+WHY_NOT: Real SMS and subscription acceptance require the user's phone and interaction. No real SMS was sent during verification. macOS is the available desktop environment.
+
+EVIDENCE_PATH: `test/browser-login.test.mjs`; `test/current-browser.test.mjs`; `scripts/test-magpie.mjs`; `docs/quota-api.md`; local-only `.verification/tests-0.3.1.txt`, `.verification/magpie-0.3.1.txt`, `.verification/desktop-login-anonymous.json`, `output/playwright/current-browser-confirm.png`.
+
 ## 0.3.0 — 2026-10-24
 
 - Make browser sign-in the default: open SCNet's official login page in an isolated installed Chrome/Edge browser, then read the user's identity, existing Token Plan key and subscriptions. Confirm the subscription in a Chinese page before returning credentials to Magpie. Passwords and verification codes remain on the official page; no manual Cookie/API-key copying is required.

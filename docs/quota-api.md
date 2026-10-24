@@ -17,17 +17,35 @@ Remaining Credits are `max(total - used, 0)`. Usage may exceed 100%. No price ta
 
 The optional console cookie is separate from the inference key. Quota requests have a fixed HTTPS origin/path, a ten-second deadline and `redirect: "error"`; they never carry the inference Authorization header. Upstream error bodies and network exception text are not shown or logged. Quota results use Magpie's `signIn: "kept"` to avoid clearing or expiring an unrelated inference authentication state.
 
-## Browser sign-in in 0.3.0
+## Default-browser sign-in in 0.3.1
 
-The default Magpie OAuth-style method opens an isolated installed Chrome/Edge window using `playwright-core`. This is a browser-session integration, not a claim that SCNet publishes an OAuth client registration or device authorization API. Passwords, SMS and CAPTCHA remain in the official website. Only cookies applicable to `https://www.scnet.cn/acx/` in this newly created context are read; existing browser profiles are not accessed. The browser closes on completion, cancellation or a five-minute deadline.
+Magpie opens a temporary `127.0.0.1` page using its normal browser opener (`opened: false`). The page is the local community plugin's UI, explicitly not the official website. It uses SCNet's desktop SMS API to establish a new session. It does not reuse existing browser cookies or require an extension. The phone number and one-time code are transient request inputs, not persisted metadata. No password is collected.
 
-Current SCNet sources checked on 2026-10-24:
+Current official source: the anonymous endpoint `GET /acx/platform/config/client/client-download-url?os=mac` returned SCNet 3.2.1 and [its official DMG](https://dlcdn.scnet.cn/client/mac/SCNet-3.2.1-arm64.dmg) on 2026-10-24. The DMG was mounted read-only for source inspection and detached; the application was not installed or executed.
 
-- Login entry: `https://www.scnet.cn/ui/acm/index.html`; route `/login` in `assets/index-BUxD3tNN.js`, with the official login component `assets/Login-Q7uT9Ak0.js`.
-- `GET /acx/user/users/current-user-info`: current user ID and `userName`, declared in the console app bundle.
-- `GET /acx/llm/api-key/token-plan/query`: read the existing Token Plan key. The declaration and response alternatives are in `68.c5b19b0a.js`; `2938.13931614.js` invokes it for the subscription page. The plugin never calls the separate create/reset endpoints.
-- `GET /acx/llm/api/package/overview?packageType=TokenPlan`, optionally with `code`: resolve each subscription's `resourceId` to exactly the matching package `code` and its `models`. An anonymous read returned the expected catalog envelope. Unmatched models require user input; an unrelated catalog row is never selected.
+- `app.asar/dist-electron/main/index.js`, modules 69847/11204: form POST `/ac/api/auth/sendDesktopClientPhoneCode.action` with `phoneNum`, then `/ac/api/auth/loginDesktopClientByPhoneCode.action` with `messageCode`, `isSevenDaysValidity=true` and the challenge cookie.
+- `app.asar/dist/static/js/async/3291.362a539e0a.js`: country prefix plus phone number, six-digit code UI and 60-second send cooldown. The native client also supports passwords; this plugin uses SMS only.
+- Empty form requests to those two endpoints returned business code `1003` identifying missing `phoneNum` and `messageCode`, respectively, with a `jsessionid` cookie. No phone number, real code or SMS was submitted during this anonymous check. This establishes request shape, not successful authenticated login.
 
-The offline confirmation page receives only the display name, plan choices, expiry and model IDs. It never receives the Cookie or key. Only after the user confirms a listed subscription does the callback return an API credential plus session metadata to Magpie's normal credential storage. Legacy/manual accounts are preserved; the host updates an existing matching browser identity on repeated sign-in. The API-key method remains an advanced fallback.
+After login, the plugin reads these fixed console endpoints, independently established from current official console bundles:
 
-Verified locally: 31 unit tests; real Magpie CLI manual and browser callback/storage integration, repeated sign-in and quota rendering; twelve mocked gateway protocol cases; a real Chrome confirmation page clicked through using synthetic data. **Not verified:** real authenticated browser sign-in, subscription response or cookie lifetime. A bounded live inference request passed on the earlier API-key version; it does not validate the new browser flow. Session cookies must never be supplied in public issues or logs.
+- `GET /acx/user/users/current-user-info`: current user ID and `userName`.
+- `GET /acx/charge/account/currentuser/tokenplan/list`: active subscriptions.
+- `GET /acx/llm/api-key/token-plan/query`: existing Token Plan key. The plugin never calls create/reset endpoints.
+- `GET /acx/llm/api/package/overview?packageType=TokenPlan`, optionally with `code`: match each subscription's `resourceId` to exactly its package `code` and `models`. Unmatched models require input.
+
+The browser receives only display identity, subscription choices, expiry and models. The API key and SCNet session stay server-side until the confirmed credential is returned to Magpie. Each login has an independent cookie jar, capability, deadline and listener. Cookie domain/path/expiry are respected; requests use a fixed SCNet HTTPS origin, disabled redirects and bounded timeouts. SMS delivery happens only on a user click and is never retried automatically. Local API requests require the exact Host, Origin, per-attempt capability and JSON content type; request bodies are bounded, and the page has no external scripts or framing permission. The capability is removed from browser history after load.
+
+Legacy/manual accounts are retained. Repeated sign-in for the same identity/subscription updates that browser account through Magpie's normal persistence. Cancellation or timeout returns no credential. Closing the tab leaves the attempt to expire; refreshing requires a new attempt.
+
+## Why 0.3.0 was replaced
+
+Version 0.3.0 launched an isolated Chrome/Edge context, which did not meet the user's current-browser requirement. Merely opening the official login URL in a normal browser does not transfer its authenticated session to a plugin. An anonymous CAS check rejected `http://127.0.0.1:49152/callback` with title **Application Not Authorized to Use CAS**, while accepting SCNet's own service callback. No third-party OAuth registration for scnet-auth was established. A browser extension was explicitly rejected; 0.3.1 instead uses the official desktop SMS API in a clearly labelled local page.
+
+## Acceptance boundary
+
+Verified with synthetic data: unit tests for callback persistence inputs, host/origin/capability checks, SMS cooldown, cookie scope, selection, cancellation, timeout and sanitized failures; real isolated Magpie CLI persistence, repeated login, selected-plan quota and twelve gateway protocol cases. Browser/render acceptance and exact-head CI are recorded in the release changelog.
+
+Not verified: real authenticated SMS sign-in, real subscription/remaining Credits or session lifetime. The earlier API-key release passed a bounded live inference check; that does not validate SMS sign-in. Internal SCNet APIs may change. Session cookies and one-time codes must never be supplied in public issues or logs.
+
+Local-only evidence: `.verification/desktop-login-anonymous.json`, `.verification/current-browser-auth.json`, extracted official source under `.verification/source/client/`, `.verification/current-browser-red.txt`, `.verification/tests-0.3.1.txt`, `.verification/magpie-0.3.1.txt`.
