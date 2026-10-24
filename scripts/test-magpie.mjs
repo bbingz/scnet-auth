@@ -27,9 +27,12 @@ const requests = join(sandbox, "requests.jsonl")
 const quote = (value) => "'" + value.replaceAll("'", "'\\''") + "'"
 
 await writeFile(preload, `
-import { appendFileSync } from "node:fs"
+import { appendFileSync, existsSync } from "node:fs"
 import { EventEmitter } from "node:events"
-import { chromium } from ${JSON.stringify(join(root, "node_modules/playwright-core/index.mjs"))}
+import { createRequire } from "node:module"
+const installedPackage = ${JSON.stringify(join(sandbox, "config/magpie/plugins/node_modules/scnet-auth/package.json"))}
+const requirePlugin = createRequire(existsSync(installedPackage) ? installedPackage : ${JSON.stringify(join(root, "package.json"))})
+const { chromium } = requirePlugin("playwright-core")
 chromium.launch = async () => {
   const browser = new EventEmitter()
   browser.newContext = async () => ({
