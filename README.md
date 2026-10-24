@@ -17,7 +17,7 @@ In Magpie, open **Plugins → Discover** and search for **scnet**. GitHub discov
 You can also install directly:
 
 ```sh
-magpie plugin add github:bbingz/opencode-scnet-auth
+magpie plugin add github:bbingz/scnet-auth
 magpie plugin login scnet-token-plan
 ```
 
@@ -35,7 +35,7 @@ To change an account's model list, sign in again with the same key and the new I
 
 ```sh
 magpie plugin logout scnet-token-plan
-magpie plugin rm github:bbingz/opencode-scnet-auth
+magpie plugin rm github:bbingz/scnet-auth
 ```
 
 ## Endpoints and credentials

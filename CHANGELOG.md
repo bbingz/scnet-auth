@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-10-24 — Rename to scnet-auth
+
+- Rename the package and GitHub repository to `scnet-auth`, and update installation, removal, repository and issue links.
+- Keep the provider ID `scnet-token-plan` and OpenCode discovery keywords so existing account/model configuration and Magpie discovery remain compatible.
+
 ## 0.1.0 — 2026-10-24
 
 - Add the `scnet-token-plan` provider using Magpie's documented OpenCode plugin hooks, with dedicated API-key sign-in and model IDs scoped to each account.

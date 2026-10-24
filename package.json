@@ -1,5 +1,5 @@
 {
-  "name": "opencode-scnet-auth",
+  "name": "scnet-auth",
   "version": "0.1.0",
   "description": "SCNet Token Plan provider plugin for Magpie: API key sign-in, account-specific models and streaming tool calls.",
   "type": "module",
@@ -10,9 +10,9 @@
     "test:magpie": "node scripts/test-magpie.mjs"
   },
   "keywords": ["magpie-plugin", "opencode", "opencode-plugin", "provider", "auth", "scnet", "token-plan", "deepseek"],
-  "repository": { "type": "git", "url": "git+https://github.com/bbingz/opencode-scnet-auth.git" },
-  "homepage": "https://github.com/bbingz/opencode-scnet-auth#readme",
-  "bugs": { "url": "https://github.com/bbingz/opencode-scnet-auth/issues" },
+  "repository": { "type": "git", "url": "git+https://github.com/bbingz/scnet-auth.git" },
+  "homepage": "https://github.com/bbingz/scnet-auth#readme",
+  "bugs": { "url": "https://github.com/bbingz/scnet-auth/issues" },
   "license": "MIT",
   "engines": { "node": ">=22" }
 }
