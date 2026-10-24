@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.3.2 — 2026-10-24
+
+- Open SCNet's official login page in the default browser. Replace the rejected local SMS form with read-only import of that browser's SCNet session on macOS; retain only a post-login account/subscription confirmation page. Remove the SMS module and its endpoints.
+- Resolve only the default Chrome/Edge/Brave browser and its last-used profile. Query exact SCNet hosts and console paths in read-only SQLite, excluding partitioned/expired cookies. Never copy the whole browser database, scan other profiles, or read other sites/passwords/history. Use macOS Keychain with its normal authorization; keep the secret/derived key transient, validate Chromium hostname binding, and stop on refusal or unsupported storage. No dependencies or browser security changes.
+- Recheck identity/key/plan before saving, reject stale confirmations after account switching, and allow explicit reread. Preserve manual accounts, exact model matching and selected-plan quota. Update Chinese/English support limits and privacy explanations. Node's SQLite path requires Node >=22.13; Magpie uses Bun's built-in SQLite.
+- Verified real current-default Chrome Beta session import, official identity and existing key, one subscription's model mapping, and real Credits through the production quota reader under Bun. No phone/code/password input, real inference, key reset or purchase was performed. Live evidence stores only sanitized outcomes.
+
+CHECKS_RUN: 45 passing unit tests; initially failing official-page and Chromium 64-bit expiry regressions; isolated real Magpie CLI encrypted-browser fixture import, confirmation persistence, repeat login, existing-account preservation, selected-plan quota and 12 mock gateway cases; rendered confirmation/reread/success checks; real Chrome Beta session and quota read-only probes; package dry-run; whitespace check.
+
+CHECKS_NOT_RUN: fresh signed-out website login followed by cookie flush/import; other browser live accounts; native OpenCode; unsupported Safari/Windows/Linux automatic import; long-term session expiry.
+
+WHY_NOT: Live verification used the user's already authenticated default Chrome Beta profile; other environments and a fresh interactive login were not exercised. No broad compatibility claim is made.
+
+EVIDENCE_PATH: `.verification/official-browser-red.txt`; `.verification/browser-timestamp-red.txt`; `.verification/tests-0.3.2.txt`; `.verification/magpie-0.3.2.txt`; `.verification/live-browser-session.json`; `.verification/live-browser-quota.json`; `output/playwright/official-browser-confirm.png`; `docs/quota-api.md`.
+
 ## 0.3.1 — 2026-10-24
 
 - Replace isolated Chrome/Edge sign-in with Magpie's default-browser opener and a temporary loopback page. Remove the Playwright runtime dependency. No browser extension or password is required.

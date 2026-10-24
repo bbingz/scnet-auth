@@ -1,7 +1,8 @@
 import { readFile } from "node:fs/promises"
 import { createServer } from "node:http"
 import { randomBytes } from "node:crypto"
-import { createSMSLogin, LoginError } from "./sms-login.mjs"
+import { createBrowserSession, openConfirmation, LoginError } from "./browser-session.mjs"
+import { setTimeout as delay } from "node:timers/promises"
 import { date, planId, planName } from "./quota.mjs"
 
 const ORIGIN = "https://www.scnet.cn"
@@ -76,20 +77,21 @@ export async function accountInfo(cookie, signal) {
   return { user: String(profile.userName || profile.id || profile.userId), userId: String(profile.id ?? profile.userId), key: raw.trim(), choices }
 }
 
-// Magpie opens this temporary page through its normal default-browser opener.
-// The page is a clearly labelled local plugin UI, not an SCNet OAuth page.
-export async function startBrowserLogin({ timeoutMs = 300000 } = {}) {
+// Magpie opens the official website. The local page only confirms the account
+// and subscription after SCNet has accepted the current browser session.
+export async function startBrowserLogin({ timeoutMs = 300000, pollMs = 2500, browserSession, openPage = openConfirmation } = {}) {
   const template = await readFile(new URL("./signin.html", import.meta.url), "utf8")
   const secret = randomBytes(32).toString("base64url"), nonce = randomBytes(18).toString("base64")
-  const abort = new AbortController(), sms = createSMSLogin(abort.signal)
-  let info, cookie, busy = false, ended = false, timer, origin, resolve
+  const abort = new AbortController()
+  const browser = browserSession ?? await createBrowserSession({ signal: abort.signal })
+  let info, cookie, busy = false, ended = false, timer, origin, resolve, started = false, confirmationOpened = false
   const result = new Promise(done => { resolve = done })
   const finish = value => {
     if (ended) return
     ended = true
     clearTimeout(timer)
     abort.abort()
-    sms.clear()
+    browser.clear()
     info = cookie = undefined
     server.close()
     server.closeAllConnections()
@@ -111,7 +113,7 @@ export async function startBrowserLogin({ timeoutMs = 300000 } = {}) {
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" })
       return res.end(template.replaceAll("__NONCE__", nonce))
     }
-    if (req.method !== "POST" || !["/send-code", "/login", "/choose", "/cancel"].includes(req.url)) return reply(404, { error: "请求不存在" })
+    if (req.method !== "POST" || !["/account", "/refresh", "/choose", "/cancel"].includes(req.url)) return reply(404, { error: "请求不存在" })
     if (req.headers.origin !== origin || req.headers["x-scnet-login"] !== secret ||
       req.headers["sec-fetch-site"] === "cross-site" || req.headers["content-type"]?.split(";")[0].trim() !== "application/json") {
       return reply(403, { error: "请从 Magpie 打开的本机页面继续登录" })
@@ -132,18 +134,25 @@ export async function startBrowserLogin({ timeoutMs = 300000 } = {}) {
       })
       if (!body || typeof body !== "object" || Array.isArray(body)) throw new LoginError("请求格式不正确")
       if (ended) return
-      if (req.url === "/send-code") {
-        if (cookie) throw new LoginError("此页面已登录，请确认套餐或取消后重试")
-        return reply(200, await sms.sendCode(body.phone))
+      if (req.url === "/refresh") {
+        info = cookie = undefined
+        return reply(200, { ready: false })
       }
-      if (req.url === "/login") {
-        if (!cookie) cookie = await sms.login(body.code)
-        info = await accountInfo(cookie, abort.signal)
-        return reply(200, { user: info.user, choices: info.choices })
-      }
+      if (req.url === "/account") return reply(200, info ? { ready: true, user: info.user, choices: info.choices } : { ready: false })
       const plan = info?.choices.find(p => p.id === body.id)
       const models = plan?.models || modelList(body.models)
       if (!plan || !models) throw new LoginError("请选择套餐，并填写该套餐支持的准确模型 ID")
+      // Recheck the browser identity before saving, in case it was switched
+      // while the confirmation page was open. Never merge different users.
+      const currentCookie = await browser.readCookie()
+      const current = await accountInfo(currentCookie, abort.signal)
+      if (ended) return
+      if (current.userId !== info.userId || current.key !== info.key ||
+          !current.choices.some(p => p.id === plan.id && p.models === plan.models)) {
+        info = current; cookie = currentCookie
+        throw new LoginError("官网账号或套餐已变化，请点击重新读取后再次确认")
+      }
+      cookie = currentCookie
       const duplicateName = info.choices.filter(p => p.name === plan.name).length > 1
       const value = { type: "success", key: info.key, metadata: {
         email: `超算互联网 · ${info.user} · ${plan.name}${duplicateName ? ` · ${plan.id}` : ""}`,
@@ -160,8 +169,34 @@ export async function startBrowserLogin({ timeoutMs = 300000 } = {}) {
   origin = `http://127.0.0.1:${server.address().port}`
   server.on("error", () => finish({ type: "failed", error: "本机登录服务已停止，请重新登录" }))
   timer = setTimeout(() => finish({ type: "failed", error: "登录已超时，请重新登录超算互联网" }), timeoutMs)
-  return { url: `${origin}/#${secret}`, opened: false, method: "auto",
-    instructions: "请在当前浏览器打开的本机登录页输入手机号和短信验证码，再确认套餐。无需扩展或复制 Cookie；此页面由 scnet-auth 提供，不会复用官网已有登录态。五分钟内有效。",
-    callback: () => result,
+  const confirmationUrl = `${origin}/#${secret}`
+  async function watch() {
+    try {
+      while (!ended) {
+        if (!info && !busy) {
+          const candidate = await browser.readCookie()
+          if (ended) return
+          if (candidate) {
+            try {
+              const found = await accountInfo(candidate, abort.signal)
+              if (ended) return
+              info = found; cookie = candidate
+              if (!confirmationOpened) {
+                confirmationOpened = true
+                await openPage(confirmationUrl, abort.signal)
+              }
+            } catch (error) { if (!(error instanceof SignedOut)) throw error }
+          }
+        }
+        await delay(pollMs, undefined, { signal: abort.signal })
+      }
+    } catch (error) {
+      if (!ended) finish({ type: "failed", error: error instanceof LoginError ? error.message : "读取官网登录结果失败，请重新登录" })
+    }
+  }
+  return { url: "https://www.scnet.cn/ui/acm/index.html#/login?redirect=" + encodeURIComponent("https://www.scnet.cn/ui/console/index.html#/llm/token-plan"),
+    opened: false, method: "auto",
+    instructions: `请在 ${browser.name} 的官网页面登录。插件仅只读获取此浏览器当前资料（${browser.profile || "当前资料"}）中 scnet.cn 的会话；macOS 如弹出钥匙串提示，请允许本次读取。登录后自动打开账号及套餐确认页，无需复制 Cookie 或安装扩展。五分钟内有效。`,
+    callback() { if (!started && !ended) { started = true; void watch() }; return result },
   }
 }

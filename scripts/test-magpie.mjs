@@ -2,12 +2,14 @@
 // No SCNet key or request is used, and the user's HOME is never overridden.
 import assert from "node:assert/strict"
 import { spawn, execFileSync } from "node:child_process"
-import { mkdtemp, readFile, writeFile, rm, realpath } from "node:fs/promises"
+import { mkdtemp, mkdir, readFile, writeFile, rm, realpath } from "node:fs/promises"
 import { createServer } from "node:net"
 import { tmpdir, homedir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { setTimeout as delay } from "node:timers/promises"
+import { DatabaseSync } from "node:sqlite"
+import { createCipheriv, createHash, pbkdf2Sync } from "node:crypto"
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..")
 assert.equal(process.platform, "darwin", "This integration harness uses macOS sandbox-exec; unit tests run on any platform")
@@ -26,20 +28,43 @@ const preload = join(sandbox, "upstream.mjs")
 const requests = join(sandbox, "requests.jsonl")
 const quote = (value) => "'" + value.replaceAll("'", "'\\''") + "'"
 
+const fixtureHome = join(sandbox, "browser-home")
+const browserRoot = join(fixtureHome, "Library/Application Support/Google/Chrome Beta")
+await mkdir(join(browserRoot, "Default/Network"), { recursive: true })
+await writeFile(join(browserRoot, "Local State"), JSON.stringify({ profile: { last_used: "Default" } }))
+const browserDB = new DatabaseSync(join(browserRoot, "Default/Network/Cookies"))
+browserDB.exec("CREATE TABLE meta(key TEXT, value TEXT); INSERT INTO meta VALUES ('version','24'); CREATE TABLE cookies(host_key TEXT, name TEXT, value TEXT, encrypted_value BLOB, path TEXT, expires_utc INTEGER, has_expires INTEGER, top_frame_site_key TEXT)")
+const cookieKey = pbkdf2Sync("fixture-keychain", "saltysalt", 1003, 16, "sha1")
+const cipher = createCipheriv("aes-128-cbc", cookieKey, Buffer.alloc(16, 32))
+const encryptedCookie = Buffer.concat([Buffer.from("v10"), cipher.update(Buffer.concat([createHash("sha256").update(".scnet.cn").digest(), Buffer.from("scnet-fixture")])), cipher.final()])
+browserDB.prepare("INSERT INTO cookies VALUES ('.scnet.cn', 'session', '', ?, '/', 0, 0, '')").run(encryptedCookie)
+browserDB.close(); cookieKey.fill(0)
+const confirmationFile = join(sandbox, "confirmation-url.txt")
+
 await writeFile(preload, `
-import { appendFileSync } from "node:fs"
+import { appendFileSync, writeFileSync } from "node:fs"
+import { mock } from "bun:test"
+import * as os from "node:os"
+import * as cp from "node:child_process"
+const originalExec = cp.execFile
+mock.module("node:os", () => ({ ...os, homedir: () => ${JSON.stringify(fixtureHome)} }))
+function fixtureExec(file, args, options, callback) {
+  if (!["/usr/bin/osascript", "/usr/bin/security", "/usr/bin/open"].includes(file)) return originalExec(file, args, options, callback)
+  let stdout = ""
+  if (file === "/usr/bin/osascript") stdout = "com.google.Chrome.beta"
+  if (file === "/usr/bin/security") stdout = Buffer.from("fixture-keychain")
+  if (file === "/usr/bin/open") writeFileSync(${JSON.stringify(confirmationFile)}, args[0])
+  queueMicrotask(() => callback(null, stdout, ""))
+  return { kill() {} }
+}
+fixtureExec[Symbol.for("nodejs.util.promisify.custom")] = (file, args, options) => new Promise((resolve, reject) => {
+  fixtureExec(file, args, options, (error, stdout, stderr) => error ? reject(error) : resolve({stdout, stderr}))
+})
+mock.module("node:child_process", () => ({ ...cp, execFile: fixtureExec }))
 const nativeFetch = globalThis.fetch
 globalThis.fetch = async (input, init) => {
   const req = new Request(input, init)
   if (new URL(req.url).hostname === "127.0.0.1") return nativeFetch(input, init)
-  if (req.url === "https://www.scnet.cn/ac/api/auth/sendDesktopClientPhoneCode.action") {
-    if ((await req.formData()).get("phoneNum") !== "+8613800000000") throw new Error("Wrong fixture phone")
-    return Response.json({ code: "0" }, { headers: { "set-cookie": "session=challenge; Path=/; Secure; HttpOnly" } })
-  }
-  if (req.url === "https://www.scnet.cn/ac/api/auth/loginDesktopClientByPhoneCode.action") {
-    if ((await req.formData()).get("messageCode") !== "123456" || req.headers.get("cookie") !== "session=challenge") throw new Error("Wrong SMS fixture session")
-    return Response.json({ code: "0" }, { headers: { "set-cookie": "session=scnet-fixture; Path=/; Secure; HttpOnly" } })
-  }
   const consoleFixtures = {
     "/acx/user/users/current-user-info": { id: "fixture-user", userName: "Fixture browser" },
     "/acx/llm/api-key/token-plan/query": { apiKey: ${JSON.stringify(fixtureKey)} },
@@ -112,15 +137,22 @@ const sandboxProfile = `(version 1)
 const launch = (args, stdio) => spawn("/usr/bin/sandbox-exec", ["-p", sandboxProfile, magpie, ...args], { env, cwd: sandbox, stdio })
 const logs = []
 async function cli(args, input = "") {
+  if (args.join(" ") === "plugin login scnet-token-plan 1") await rm(confirmationFile, { force: true })
   const child = launch(args, ["pipe", "pipe", "pipe"])
   let output = "", interaction, interactionError
   const collect = data => {
     output += data
     if (args.join(" ") !== "plugin login scnet-token-plan 1" || interaction) return
-    const match = output.match(/http:\/\/127\.0\.0\.1:\d+\/#[-\w]+/)
-    if (!match) return
+    if (!output.includes("https://www.scnet.cn/ui/acm/index.html")) return
     interaction = (async () => {
-      const url = new URL(match[0])
+      let address
+      const until = Date.now() + 15000
+      while (Date.now() < until) {
+        try { address = await readFile(confirmationFile, "utf8"); break } catch {}
+        await delay(50)
+      }
+      assert.ok(address, "The authenticated browser flow must open the confirmation page")
+      const url = new URL(address)
       const post = async (path, body) => {
         const response = await fetch(url.origin + path, { method: "POST", headers: {
           "content-type": "application/json", origin: url.origin, "x-scnet-login": url.hash.slice(1),
@@ -128,8 +160,7 @@ async function cli(args, input = "") {
         assert.equal(response.status, 200)
         return response.json()
       }
-      await post("/send-code", { phone: "13800000000" })
-      const data = await post("/login", { code: "123456" })
+      const data = await post("/account", {})
       assert.equal(data.user, "Fixture browser")
       await post("/choose", { id: "fixture-event" })
     })().catch(error => { interactionError = error; child.kill("SIGKILL") })

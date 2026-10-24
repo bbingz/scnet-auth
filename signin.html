@@ -13,32 +13,17 @@
   select, input { width: 100%; border: 1px solid #b9c7db; background: white; }
   button { border: 0; background: #1259c3; color: white; font-weight: 600; cursor: pointer; }
   button:disabled { opacity: .55; cursor: default; } :focus-visible { outline: 3px solid #78b5ff; outline-offset: 3px; }
-  .row { display: flex; gap: 10px; } .row input { min-width: 0; } .row button { flex-shrink: 0; }
   .primary { width: 100%; margin-top: 20px; } .secondary { background: #eaf0f9; color: #295285; }
-  .note { font-size: 13px; } .check { display: flex; gap: 9px; font-size: 13px; font-weight: 400; line-height: 1.6; color: #536078; }
-  .check input { width: 18px; height: 18px; flex-shrink: 0; margin-top: 2px; }
+  .note { font-size: 13px; }
   #error { color: #ad2525; } a { color: #1259c3; } [hidden] { display: none; }
   footer { border-top: 1px solid #e3e9f2; margin-top: 24px; padding-top: 16px; }
   @media (max-width: 430px) { main { padding: 22px 18px; } body { padding: 18px 12px; } }
 </style>
 <main>
   <div class="brand">scnet-auth · Magpie 社区插件</div>
-  <h1 id="title">登录超算互联网</h1>
-  <section id="signin">
-    <p>在当前浏览器完成登录，自动连接你的账号和 Token Plan 额度。</p>
-    <p class="note">这是运行在本机的插件页面，并非超算互联网官网。需要重新验证手机号，不会读取浏览器已有登录态。</p>
-    <form id="login">
-      <label for="phone">手机号</label>
-      <input id="phone" type="tel" autocomplete="tel" placeholder="11 位手机号，或 +国家区号 手机号" required maxlength="24">
-      <label class="check"><input id="consent" type="checkbox" required><span>允许本机插件将手机号和短信验证码发送至超算互联网，仅用于本次登录。插件不保存或记录这两项信息。</span></label>
-      <label for="code">短信验证码</label>
-      <div class="row"><input id="code" inputmode="numeric" autocomplete="one-time-code" placeholder="6 位验证码" pattern="[0-9]{6}" maxlength="6" required><button id="send" type="button" class="secondary" disabled>获取验证码</button></div>
-      <p id="sent" class="note" role="status"></p>
-      <button id="loginButton" class="primary" type="submit" disabled>登录并读取套餐</button>
-    </form>
-    <p class="note">使用已注册的超算互联网账号。<a href="https://www.scnet.cn/" target="_blank" rel="noopener noreferrer">前往官网注册或管理账号 ↗</a></p>
-  </section>
-  <section id="selection" hidden>
+  <h1 id="title">确认连接的套餐</h1>
+  <p class="note">已从你的浏览器读取 SCNet 官网登录结果。此页只用于确认连接，不需要输入密码或短信验证码。</p>
+  <section id="selection">
     <p id="account"></p>
     <p>确认后，现有 API Key 和额度会话将保存在本机 Magpie，供模型调用及额度查询使用。</p>
     <form id="connect">
@@ -48,13 +33,15 @@
       <button id="submit" type="submit" class="primary">连接到 Magpie</button>
     </form>
   </section>
+  <p><button id="refresh" class="secondary" type="button">切换账号后，重新读取</button></p>
+  <p class="note">如账号不对，请在刚打开的 SCNet 官网切换账号，再重新读取。</p>
   <p id="error" role="alert"></p>
   <p id="result" role="status" hidden></p>
   <footer><button id="cancel" class="secondary" type="button">取消连接</button><p class="note" id="expiry">本页有效期为 5 分钟。关闭页面后，未完成的连接会在到期时自动取消。</p></footer>
 </main>
 <script nonce="__NONCE__">
   const byId = id => document.getElementById(id);
-  let secret = location.hash.slice(1), choices = [], sent = false, waiting = false, remaining = 0, countdown;
+  let secret = location.hash.slice(1), choices = [], timer, ended = false;
   history.replaceState(null, '', location.pathname);
   async function request(path, body = {}) {
     const response = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-SCNet-Login': secret }, body: JSON.stringify(body), cache: 'no-store' });
@@ -62,45 +49,34 @@
     if (!response.ok) throw Error(data.error || '请求未完成，请重试');
     return data;
   }
-  function controls() {
-    byId('send').disabled = waiting || remaining > 0 || !byId('consent').checked || !secret;
-    byId('send').textContent = remaining > 0 ? `${remaining} 秒后重发` : '获取验证码';
-    byId('loginButton').disabled = waiting || !sent || !byId('consent').checked || !secret;
-  }
   function failed(error) { byId('error').textContent = error instanceof TypeError ? '本机连接已结束或超时，请返回 Magpie 重新登录。' : error.message; }
   function done(message) {
-    secret = ''; clearInterval(countdown); byId('login').reset();
-    byId('signin').hidden = byId('selection').hidden = true;
-    byId('cancel').hidden = true; byId('expiry').hidden = true;
+    ended = true; secret = ''; clearTimeout(timer);
+    byId('selection').hidden = true;
+    byId('cancel').hidden = byId('refresh').hidden = true; byId('expiry').hidden = true;
     byId('title').textContent = message; byId('error').textContent = '';
     byId('result').hidden = false; byId('result').textContent = '现在可以关闭此页面，返回 Magpie。';
   }
-  byId('consent').addEventListener('change', controls);
-  byId('send').addEventListener('click', async () => {
-    if (!byId('phone').reportValidity() || !byId('consent').reportValidity()) return;
-    waiting = true; sent = false; byId('error').textContent = ''; controls();
+  async function load() {
+    byId('submit').disabled = true;
     try {
-      const data = await request('/send-code', { phone: byId('phone').value });
-      sent = true; byId('phone').readOnly = true; byId('code').value = '';
-      byId('sent').textContent = '验证码已发送，请查看手机短信。'; byId('code').focus();
-      remaining = data.resendIn;
-    } catch (error) { remaining = 60; failed(error); }
-    finally {
-      waiting = false; clearInterval(countdown);
-      countdown = setInterval(() => { remaining = Math.max(0, remaining - 1); controls(); if (!remaining) clearInterval(countdown); }, 1000); controls();
-    }
-  });
-  byId('login').addEventListener('submit', async event => {
-    event.preventDefault(); waiting = true; byId('error').textContent = ''; controls();
-    const code = byId('code').value; byId('code').value = '';
-    try {
-      const data = await request('/login', { code }); choices = data.choices;
-      byId('login').reset(); clearInterval(countdown);
-      byId('signin').hidden = true; byId('selection').hidden = false; byId('title').textContent = '确认连接的套餐';
+      const data = await request('/account');
+      if (ended) return;
+      if (!data.ready) {
+        byId('account').textContent = '等待官网登录完成，请在官网标签页继续。';
+        timer = setTimeout(load, 1500); return;
+      }
+      choices = data.choices;
       byId('account').textContent = '已登录：' + data.user; byId('plan').replaceChildren();
       for (const plan of choices) { const option = document.createElement('option'); option.value = plan.id; option.textContent = plan.name + (choices.length > 1 ? ' · ' + plan.id : ''); byId('plan').append(option); }
-      byId('plan').dispatchEvent(new Event('change')); byId('plan').focus();
-    } catch (error) { failed(error); } finally { waiting = false; controls(); }
+      byId('plan').dispatchEvent(new Event('change')); byId('submit').disabled = false;
+    } catch (error) { failed(error); }
+  }
+  byId('refresh').addEventListener('click', async () => {
+    byId('refresh').disabled = true; byId('submit').disabled = true; byId('error').textContent = ''; clearTimeout(timer);
+    try { await request('/refresh'); await load(); }
+    catch (error) { failed(error); }
+    finally { byId('refresh').disabled = false; }
   });
   byId('plan').addEventListener('change', () => {
     const plan = choices.find(p => p.id === byId('plan').value); if (!plan) return;
@@ -117,7 +93,7 @@
     try { await request('/cancel'); done('已取消连接'); }
     catch (error) { failed(error); byId('cancel').disabled = false; }
   });
-  if (!secret) { byId('error').textContent = '请从 Magpie 重新打开登录页；直接刷新或复制此地址无法继续连接。'; byId('cancel').disabled = true; }
-  controls();
+  if (!secret) { byId('error').textContent = '请从 Magpie 重新打开登录页；直接刷新或复制此地址无法继续连接。'; byId('cancel').disabled = byId('refresh').disabled = byId('submit').disabled = true; }
+  else load();
 </script>
 </html>

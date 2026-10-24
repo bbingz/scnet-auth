@@ -2,7 +2,7 @@
 
 [简体中文](README.md)
 
-An independent MIT-licensed plugin connecting your own SCNet Token Plan to Magpie. Version 0.3.1 defaults to browser sign-in, automatically importing account identity, an existing Token Plan key, subscription models and a session for Credits usage. It uses Node.js built-ins and the default browser; no extension, Playwright, browser download or build step.
+An independent MIT-licensed plugin connecting your own SCNet Token Plan to Magpie. Version 0.3.2 defaults to browser sign-in, automatically importing account identity, an existing Token Plan key, subscription models and a session for Credits usage. It uses Node.js built-ins and the default browser; no extension, Playwright, browser download or build step.
 
 ![Account and quota in real Magpie](docs/account-quota.png)
 
@@ -17,11 +17,13 @@ magpie plugin add github:bbingz/scnet-auth
 magpie plugin login scnet-token-plan
 ```
 
-Choose **浏览器登录超算互联网（推荐）**. Magpie opens a temporary loopback page in your current default browser. Enter your registered phone number, consent to sending it to SCNet for this sign-in, request an SMS code, then sign in and confirm the subscription. The plugin imports the identity, existing Token Plan key, exact subscription models and quota session. It never creates/resets keys or purchases plans.
+Choose **浏览器登录超算互联网（macOS 官网）**. Magpie opens SCNet's official login page in the default browser. Sign in normally, or use its existing website session. If macOS asks for browser Keychain access, allow this attempt. A local confirmation page then shows the account and subscriptions; only confirmation saves the existing Token Plan key and quota session. The plugin never creates/resets keys or purchases plans.
 
-The page is explicitly labelled as a local community-plugin UI, not the SCNet website. It uses the official desktop client's SMS endpoints and establishes a new session; it does not reuse an existing website login. Phone numbers and SMS codes are neither persisted nor logged. No password is requested. Only confirmed credentials/session metadata enter Magpie storage.
+Automatic import currently supports macOS Chrome (stable/Beta/Dev/Canary), Edge and Brave. Real account/key/model/quota reads were verified with Chrome Beta; other supported browser mappings have not had live-account acceptance. Safari, Windows, Linux and headless environments use the advanced manual method. Private/incognito browser sessions are not supported.
 
-Complete sign-in on the same computer as Magpie. The listener binds only to `127.0.0.1`, requires a per-attempt capability and exact Origin/Host for API requests, rejects cross-site calls, and closes on success, explicit cancellation or a five-minute timeout. Refreshing the page requires restarting sign-in. No isolated browser is launched. Real authenticated SMS sign-in and quota still need user acceptance; automated checks use synthetic data.
+Only the default browser's last-used profile is accessed. Read-only SQL selects exact SCNet hosts and console paths before cookie data leaves the database. No other profiles are scanned; no whole database is copied; other sites, passwords and browsing history are not read. The macOS browser Keychain secret is used only in memory to decrypt SCNet cookies, then cleared. Refused OS access ends the attempt; no security settings are modified. This is scoped browser-session import, not a claim of official SCNet OAuth support.
+
+The official login page collects credentials. The later loopback page only confirms the identity/subscription and collects no phone number, OTP or password. For a different account, switch accounts on SCNet and click the confirmation page's reload button. Identity is rechecked before saving. The listener binds only to `127.0.0.1`, requires a per-attempt capability and exact Origin/Host, rejects cross-site requests, and closes on success, cancellation or a five-minute timeout. Refreshing the confirmation page requires a new attempt. No extension or separate browser is launched.
 
 ## Advanced manual setup
 
@@ -39,7 +41,7 @@ In your browser, sign in to the [Token Plan console](https://www.scnet.cn/ui/con
 
 Cookies are login credentials. Keep them out of issues, chat and screenshots. The plugin stores the cookie only in the account's Magpie credential metadata and sends it only to the fixed HTTPS console endpoint, with redirects disabled and a ten-second timeout. It is never sent to inference. Select “暂不查询额度” on a same-label sign-in to clear it.
 
-Usage reports remaining Credits, consumed/total Credits, percentage and reported expiry. Reset time is reported only when supplied. Credits are not tokens; no local token-count estimate is used. Missing sessions, expired cookies, incomplete responses and network failures produce actionable Chinese messages and never mark inference credentials as expired. This internal console API may change. The earlier API-key version passed a bounded live inference request; the new browser sign-in and real authenticated quota still require separate acceptance; automated tests use synthetic data grounded in the current console schema.
+Usage reports remaining Credits, consumed/total Credits, percentage and reported expiry. Reset time is reported only when supplied. Credits are not tokens; no local token-count estimate is used. Missing sessions, expired cookies, incomplete responses and network failures produce actionable Chinese messages and never mark inference credentials as expired. This internal console API may change. The earlier API-key version passed a bounded live inference request; Chrome Beta session import and real quota were independently checked; automated tests use synthetic data grounded in the current console schema.
 
 ## Requests and storage
 

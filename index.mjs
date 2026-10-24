@@ -62,7 +62,7 @@ export async function SCNetAuthPlugin() {
       provider: ID,
       // A self-contained mark also works when the app cannot reach image hosts.
       icon: "data:image/svg+xml;base64," + Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#1259c3"/><path d="M18 19h28v8H26v5h20v13H18v-8h20v-5H18z" fill="white"/></svg>').toString("base64"),
-      methods: [{ type: "oauth", label: "浏览器登录超算互联网（推荐）", authorize: () => startBrowserLogin() }, signInMethod()],
+      methods: [{ type: "oauth", label: "浏览器登录超算互联网（macOS 官网）", authorize: () => startBrowserLogin() }, signInMethod()],
       usage,
       async loader(getAuth) {
         requireKey(await getAuth())
