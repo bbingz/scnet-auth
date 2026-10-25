@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.6 — 2026-10-25
+
+- The plugin market card shows SCNet's own mark (the red "SCNet" of its website icon) instead of a generic puzzle piece; it is set in `package.json`'s `magpie.icon`. The provider and its accounts use the same picture in place of the blue "S" drawn for 0.2.0.
+
 ## Documentation — 2026-10-25
 
 - Rewrite the Chinese and English READMEs around installing, signing in, Credits and removing accounts, and turn `docs/quota-api.md` into a plain description of how sign-in and Credits work.

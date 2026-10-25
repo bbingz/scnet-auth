@@ -2,8 +2,11 @@ import { cookieError, date, planId, planName, plans, usage } from "./quota.mjs"
 import { startBrowserLogin } from "./browser-login.mjs"
 import { accountManagement } from "./accounts.mjs"
 import { isAbsolute } from "node:path"
+import { readFileSync } from "node:fs"
 
 const ID = "scnet-token-plan"
+// The market card reads package.json's magpie.icon; the provider shows the same picture.
+const ICON = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8")).magpie.icon
 const BASE = "https://api.scnet.cn/api/llm/v1"
 const DEFAULT_MODEL = "DeepSeek-V4.1-Flash-1017-Event"
 const NPM = "@ai-sdk/openai-compatible"
@@ -65,8 +68,8 @@ export async function SCNetAuthPlugin(input = {}) {
     },
     auth: {
       provider: ID,
-      // A self-contained mark also works when the app cannot reach image hosts.
-      icon: "data:image/svg+xml;base64," + Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#1259c3"/><path d="M18 19h28v8H26v5h20v13H18v-8h20v-5H18z" fill="white"/></svg>').toString("base64"),
+      // SCNet's mark, embedded so it also shows when the app cannot reach image hosts.
+      icon: ICON,
       methods: [{ type: "oauth", label: "浏览器登录超算互联网（macOS 官网）", authorize: () => startBrowserLogin() }, signInMethod(), ...management],
       usage,
       async loader(getAuth) {

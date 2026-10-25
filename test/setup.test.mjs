@@ -1,4 +1,5 @@
 import assert from "node:assert/strict"
+import { readFileSync } from "node:fs"
 import { test, afterEach, mock } from "node:test"
 import { SCNetAuthPlugin } from "../index.mjs"
 
@@ -8,13 +9,24 @@ const MODEL = "DeepSeek-V4.1-Flash-1017-Event"
 const auth = (metadata = {}) => ({ type: "api", key: "fixture-key", metadata })
 const row = (extra = {}) => ({ resourceAccountId: "plan-1", name: "DeepSeek 活动套餐", status: "enable", totalAmount: "60000", usedAmount: "1234.5", maxExpireTime: "2099-11-24 23:59:59", ...extra })
 const reply = (data) => mock.method(globalThis, "fetch", async () => Response.json({ code: "0", data }))
+const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"))
 afterEach(() => mock.restoreAll())
+
+test("package.json gives the market card SCNet's mark as Magpie accepts it", () => {
+  // Magpie keeps magpie.icon only as an https URL or a data:image URI, and stores at most 1 MB.
+  const [head, data] = String(pkg.magpie?.icon).split(",")
+  assert.equal(head, "data:image/png;base64")
+  const png = Buffer.from(data, "base64")
+  assert.equal(png.toString("base64"), data)
+  assert.deepEqual([...png.subarray(0, 8)], [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+  assert.ok(png.length < 1 << 20)
+})
 
 test("Chinese setup identifies the provider and account without using the key as its name", async () => {
   const config = {}
   await hooks.config(config)
   assert.match(config.provider["scnet-token-plan"].name, /超算互联网/)
-  assert.match(hooks.auth.icon, /^data:image\/svg\+xml;base64,/)
+  assert.equal(hooks.auth.icon, pkg.magpie.icon)
   assert.equal((await method.ask({})).key, "label")
   assert.match(method.prompts.find(p => p.key === "label").validate(""), /账号/)
   const saved = await method.authorize({ label: "主账号", plan: "event", quota: "skip" })
