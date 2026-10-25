@@ -1,49 +1,68 @@
-# Quota source and acceptance boundary
+# How sign-in and Credits work
 
-Checked on 2026-10-24. This adapter uses the SCNet console's internal read-only subscription endpoint; no public API stability guarantee is assumed.
+SCNet has no public OAuth or quota API for third-party tools. This plugin reads the SCNet session your own browser already holds and uses the same console endpoints SCNet's web console calls. Those endpoints are internal and may change without notice. Endpoint paths and fields were checked against SCNet's public console bundles on 2026-10-24.
 
-- Current console entry: https://www.scnet.cn/ui/console/index.html
-- Entry bundle: https://www.scnet.cn/ui/console/static/js/app.70224a61.js
-- API declaration: https://www.scnet.cn/ui/console/static/js/16.a21f8a46.js contains `GET /charge/account/currentuser/tokenplan/list` under the `/acx` console API prefix.
-- Plan rendering: https://www.scnet.cn/ui/console/static/js/68.c5b19b0a.js reads the total/used fields and expiration fields used by this adapter.
-- Plan page: https://www.scnet.cn/ui/console/static/js/2938.13931614.js uses `resourceAccountId` to scope subscription usage.
-- An anonymous read of https://www.scnet.cn/acx/charge/account/currentuser/tokenplan/list returned JSON business code `401` and a login-required message. A 401 alone does not establish an arbitrary endpoint's existence; the current frontend source establishes this path.
+## Endpoints
 
-The initial discovery lead was [Ronnie-Young/dsh-scnet-plan](https://github.com/Ronnie-Young/dsh-scnet-plan/blob/main/docs/scnet-api.md). Endpoint and field assumptions were independently checked against SCNet's current public bundles. No code was copied from that implementation.
+All console requests go to `https://www.scnet.cn/acx` with the session cookie, a ten-second timeout and `redirect: "error"`. None carries the inference key.
 
-The expected envelope is `{code: "0", data: [...]}`. Other shapes fail explicitly. Each subscription is matched by `resourceAccountId`; absent or duplicate matches fail rather than selecting an unrelated subscription. Total fields follow the frontend's `totalAmount`, `All`, `planCredits`, `monthlyCredits`, `totalCredits` alternatives. Consumed fields follow `usedAmount`, `used`, `usedCredits`, `consumeCredits`, `consumedCredits`, `consume`, `usage`. Missing, negative, nonnumeric, empty and boolean values are not interpreted as zero.
+| Request | Used for |
+| --- | --- |
+| `GET /user/users/current-user-info` | User ID and name |
+| `GET /charge/account/currentuser/tokenplan/list` | The account's Token Plan subscriptions and their Credits |
+| `GET /llm/api-key/token-plan/query` | The existing Token Plan key (read only; never created or reset) |
+| `GET /llm/api/package/overview?packageType=TokenPlan` (optionally `&code=`) | The models of a plan, matched by its `resourceId` |
 
-Remaining Credits are `max(total - used, 0)`. Usage may exceed 100%. No price table, screenshot balance, public plan catalog or local token estimate supplies account balances. Unzoned console timestamps are interpreted as UTC+08:00. Expiry does not imply automatic renewal; reset time is emitted only if provided.
+Responses are expected as `{code: "0", data: ...}`. A business code `401`/`403` means signed out; any other shape fails with a Chinese message, without echoing the upstream body. An anonymous request to these paths returns code `401` ("用户未登录").
 
-The optional console cookie is separate from the inference key. Quota requests have a fixed HTTPS origin/path, a ten-second deadline and `redirect: "error"`; they never carry the inference Authorization header. Upstream error bodies and network exception text are not shown or logged. Quota results use Magpie's `signIn: "kept"` to avoid clearing or expiring an unrelated inference authentication state.
+Source of the paths and fields: the console bundle `https://www.scnet.cn/ui/console/static/js/16.a21f8a46.js` declares `GET /charge/account/currentuser/tokenplan/list` under `/acx`; `68.c5b19b0a.js` renders its total, used and expiry fields; `2938.13931614.js` scopes usage by `resourceAccountId`. The first lead came from [Ronnie-Young/dsh-scnet-plan](https://github.com/Ronnie-Young/dsh-scnet-plan/blob/main/docs/scnet-api.md); no code was taken from it.
 
-## Official-page sign-in in 0.3.3
+## Browser sign-in (macOS)
 
-Magpie opens `https://www.scnet.cn/ac/api/auth/loginSsoRedirect.action` in the default browser, with the Token Plan console in `originalUrl`. This is the desktop SSO entry used by the official homepage; 0.3.3 replaces the compact `/ui/acm/` login entry from 0.3.2. No plugin login form collects credentials. On macOS, the plugin identifies the default browser using NSWorkspace, selects only its `Local State` last-used profile, and reads that profile's Cookie database read-only. SQL restricts rows to exact SCNet hosts, console paths and unpartitioned cookies. Expired rows are discarded. No whole database is copied and other profiles/sites are not enumerated.
+1. Magpie opens `https://www.scnet.cn/ac/api/auth/loginSsoRedirect.action?originalUrl=<Token Plan console>` in the default browser. This is the desktop SSO entry SCNet's homepage uses; the user signs in there, and the plugin never sees a password or code.
+2. The plugin asks macOS (NSWorkspace) for the default browser. Chrome (stable, Beta, Dev, Canary), Edge and Brave are supported; anything else gets a message pointing to manual setup.
+3. It reads the browser's `Local State` for the last-used profile, and opens only that profile's `Cookies` database, read-only. The SQL selects only rows for `scnet.cn`, `.scnet.cn`, `www.scnet.cn` and `.www.scnet.cn`, on paths `/`, `/acx` or `/acx/`, that are unpartitioned; expired rows are dropped. Other profiles, sites and tables are never read and the database is never copied.
+4. If those rows are encrypted, the browser's "Safe Storage" secret is read from the macOS Keychain through the normal authorization prompt. Values are decrypted as Chromium does on macOS (`v10`, AES-128-CBC with a PBKDF2 key, and the host hash check of schema 24+; see [Chromium](https://chromium.googlesource.com/chromium/src/+/refs/heads/main/components/os_crypt/sync/os_crypt_mac.mm)). The secret and derived key stay in memory and are cleared when the attempt ends. A refused prompt ends the attempt.
+5. Every 2.5 seconds the cookies are read again and checked against the profile endpoint until SCNet accepts them. Then the plan, key and models are read and the account is saved. There is no local page or listener. With no accepted session after five minutes, the attempt times out and nothing is saved.
 
-Chrome/Edge/Brave's Keychain entry supplies the decryption secret through the normal macOS authorization path. The password and derived AES key are transient; authorization failure stops the attempt without changing OS/browser security. Chromium `v10` AES-CBC decoding checks the schema-24 hostname hash. Unsupported formats fail explicitly. The Chromium format is documented in [Chromium's implementation](https://chromium.googlesource.com/chromium/src/+/refs/heads/main/components/os_crypt/sync/os_crypt_mac.mm) and independently illustrated by [yt-dlp's browser-cookie reader](https://github.com/yt-dlp/yt-dlp/blob/master/yt_dlp/cookies.py). No code dependency on either project is added.
+### Choosing the plan
 
-A valid session is checked using these fixed SCNet endpoints:
+SCNet allows one Token Plan per account at a time and one key per subscription. The plugin keeps subscriptions that are enabled and not expired, and refuses duplicate IDs. Among those it prefers one with Credits left (an exhausted plan can sit beside a newly bought one), and then the one that ends first. If that plan's models can't be read, from the subscription row or from the catalog by its `resourceId`, sign-in fails and points to manual setup; models are never guessed.
 
-- `GET /acx/user/users/current-user-info`: user ID/name.
-- `GET /acx/charge/account/currentuser/tokenplan/list`: active subscriptions.
-- `GET /acx/llm/api-key/token-plan/query`: existing Token Plan key; no create/reset request.
-- `GET /acx/llm/api/package/overview?packageType=TokenPlan`, optionally `code`: exact subscription-to-model matching.
+### What is saved
 
-Since 0.3.5 the sign-in completes as soon as these reads succeed; no local confirmation page or listener is used. SCNet allows one Token Plan per account, so the plugin picks the enabled, unexpired plan with Credits left (the one ending first when several have Credits) and fails rather than guessing when that plan's models cannot be read. Success or a five-minute timeout stops access and clears the derived key. Cookies enter Magpie account metadata only on success and are sent only to fixed SCNet console URLs.
+The account is saved as an API-key sign-in with this metadata:
 
-## Why earlier versions were replaced
+| Field | Value |
+| --- | --- |
+| `email` | `超算互联网 · <user> · <plan>`, the display name; Magpie uses it to update the same account on a later sign-in |
+| `scnetUserId` | SCNet user ID |
+| `models` | The plan's model IDs, comma-separated |
+| `quota`, `consoleCookie`, `quotaPlan` | `console`, the SCNet session cookie, and the plan's `resourceAccountId` |
 
-Version 0.3.0 launched an isolated browser. Version 0.3.1 used a local SMS form backed by the official desktop client's SMS endpoints. Both were rejected for this workflow. Version 0.3.2 removes the SMS implementation and uses the user's requested official-page/current-browser flow. Its local confirmation page was removed in 0.3.5 at the user's request.
+## Credits
 
-The tested arbitrary localhost CAS service was refused, while the official callback was accepted. Community WorkBuddy uses vendor login-state/token polling; JoyCode and Trae use vendor callbacks. SCNet's legacy WeChat QR polling endpoints are live, but their existence does not establish a generic desktop browser handoff. Version 0.3.2 therefore makes no claim of an official SCNet OAuth integration.
+`usage` reads `tokenplan/list` with the saved cookie and takes the one subscription whose `resourceAccountId` equals `quotaPlan`. A missing or duplicated match fails rather than showing another plan.
 
-## Acceptance boundary
+- Total is the first of `totalAmount`, `All`, `planCredits`, `monthlyCredits`, `totalCredits`; used is the first of `usedAmount`, `used`, `usedCredits`, `consumeCredits`, `consumedCredits`, `consume`, `usage`. Missing, negative, non-numeric or empty values are not read as zero.
+- Remaining is `max(total - used, 0)`; usage can exceed 100%.
+- Times without a zone are China Standard Time (UTC+08:00). The end date doesn't imply renewal; a reset time is shown only when SCNet returns one.
+- An expired or disabled plan is reported as such, not as a balance.
+- Every result carries `signIn: "kept"`, so a failed Credits read never marks the inference key as signed out.
 
-Real read-only checks on 2026-10-24: current default Chrome Beta session decrypted through macOS Keychain, SCNet identity and existing key accepted, one subscription's models resolved, and authenticated Credits returned. The quota reader was also exercised under Bun. Evidence contains only nonsecret outcomes and quota values, never the browser secret, cookies, API key or account identifier.
+Because `quotaPlan` is fixed at sign-in, a plan bought later is followed only after signing in again.
 
-Synthetic coverage: exact-host/path/expiry/partition filtering, Chromium decryption and host binding, read-only database integrity, unsupported formats/platforms, denied/cancelled Keychain access, official-page URL, delayed website login, plan selection, missing models and timeout. Real isolated Magpie CLI verifies callback persistence, repeated login, selected-plan quota and twelve gateway protocol cases. Its fixture uses a separate encrypted browser database and fake OS responses; OS sandboxing denies actual home credentials and Keychain.
+## Inference
 
-Not yet verified: fresh signed-out website login followed by cookie flush/import; real accounts on Edge/Brave/Chrome channels other than Beta; Safari, Windows and Linux automatic import (unsupported); long-term session lifetime; native OpenCode. Internal SCNet APIs/browser storage can change. No real inference is needed for this authentication change.
+The loader allows only `https://api.scnet.cn/api/llm/v1/chat/completions`. It drops any client `Authorization`, `x-api-key`, `cookie` and similar headers, sets the account's current key as a Bearer token, refuses redirects, and passes the body, stream, tool calls and cancellation through unchanged. Magpie translates Responses and Anthropic clients to Chat Completions.
 
-Local evidence: `.verification/official-browser-red.txt`, `.verification/browser-timestamp-red.txt`, `.verification/live-browser-session.json`, `.verification/live-browser-quota.json`, `.verification/tests-0.3.2.txt`, `.verification/magpie-0.3.2.txt`.
+## Why this approach
+
+Earlier versions tried an isolated browser (0.3.0) and a local SMS form (0.3.1); both were rejected in favour of signing in on SCNet's own page in the user's browser (0.3.2). A local confirmation page after sign-in was removed in 0.3.5. SCNet's CAS refused a localhost callback service, and community plugins such as WorkBuddy rely on vendor login-state APIs that SCNet doesn't offer, so reading the browser's own session is the remaining way to finish sign-in without copying cookies.
+
+## Not verified
+
+- Real accounts on Edge, Brave and Chrome channels other than Beta
+- A fresh website sign-in followed by the browser's cookie write, end to end with a real account (session import was verified with an already signed-in Chrome Beta)
+- How long SCNet's website session lasts
+- Running in OpenCode itself

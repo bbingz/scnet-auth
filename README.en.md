@@ -2,76 +2,152 @@
 
 [简体中文](README.md)
 
-An independent MIT-licensed plugin connecting your own SCNet Token Plan to Magpie. Version 0.3.3 defaults to browser sign-in, automatically importing account identity, an existing Token Plan key, subscription models and a session for Credits usage. It uses Node.js built-ins and the default browser; no extension, Playwright, browser download or build step.
+Connects your [SCNet (超算互联网) Token Plan](https://www.scnet.cn/help/docs/mainsite/mass/plans/token-plan.html) to [Magpie](https://usemagpie.ai). Sign in on SCNet's website in your browser; the plugin picks up the account, its existing plan key, the plan's models and the Credits left, and every agent in Magpie can use those models.
 
-![Account and quota in real Magpie](docs/account-quota.png)
+- Browser sign-in on SCNet's official page that finishes by itself; no key or cookie to copy
+- Accounts show as "超算互联网 · user · plan", with Credits left, a usage bar and the plan's end date
+- Several accounts, and removal of old ones from within the plugin
+- Streaming and tool calls; Magpie carries OpenAI Chat, Responses and Anthropic Messages clients to SCNet
 
-*The screenshot uses an isolated Magpie instance and synthetic account/balance data.*
+An independent MIT-licensed community project, not an official SCNet or Magpie plugin.
 
-## Installation and setup
+![Account and quota in Magpie](docs/account-quota.png)
 
-Search **scnet**, **超算** or **超算互联网** in Magpie's Plugins discovery. This is the **Unofficial, on GitHub** section, not a maintainer-reviewed registry listing. Magpie caches the GitHub list for about ten minutes; reopen discovery afterward if an old description remains. Direct installation:
+*Example screenshot of a manually configured demo account with demo balances. Browser sign-in names accounts "超算互联网 · user · plan".*
+
+## Install
+
+In Magpie open **Plugins → Discover**, search for `scnet`, `超算` or `超算互联网`, and install `scnet-auth` from the **Unofficial, on GitHub** section. That section lists plugins their authors publish on GitHub; Magpie has not reviewed them.
+
+Or from the command line:
 
 ```sh
 magpie plugin add github:bbingz/scnet-auth
-magpie plugin login scnet-token-plan
 ```
 
-Choose **浏览器登录超算互联网（macOS 官网）**. Magpie opens SCNet's official desktop login page in the default browser. Sign in normally, or use its existing website session. If macOS asks for browser Keychain access, allow this attempt. Once SCNet accepts the session, the plugin reads the account name, existing Token Plan key, plan and models and saves the account by itself; no local confirmation page opens. The plugin never creates/resets keys or purchases plans.
+**Updating:** open **Plugins → Installed** and press **Update** on `scnet-auth`. An update reloads the plugin host, so do it while no agent is mid-request.
 
-Automatic import currently supports macOS Chrome (stable/Beta/Dev/Canary), Edge and Brave. Real account/key/model/quota reads were verified with Chrome Beta; other supported browser mappings have not had live-account acceptance. Safari, Windows, Linux and headless environments use the advanced manual method. Private/incognito browser sessions are not supported.
+## Sign in (recommended: browser, macOS)
 
-Only the default browser's last-used profile is accessed. Read-only SQL selects exact SCNet hosts and console paths before cookie data leaves the database. No other profiles are scanned; no whole database is copied; other sites, passwords and browsing history are not read. The macOS browser Keychain secret is used only in memory to decrypt SCNet cookies, then cleared. Refused OS access ends the attempt; no security settings are modified. This is scoped browser-session import, not a claim of official SCNet OAuth support.
+1. Follow Magpie's prompt after installing, or open **Providers**:
+   - first account: **Add a provider → From plugins → 超算互联网 · SCNet Token Plan**
+   - more accounts: **Add another … account** on that provider
+2. Choose **浏览器登录超算互联网（macOS 官网）**. Magpie opens SCNet's official login page in your default browser. Password, SMS and QR sign-in all work, and an existing website session is fine too.
+3. When macOS asks for Keychain access, press **Allow**. The plugin needs it to decrypt the browser's SCNet session.
+4. Wait. It usually finishes within a few seconds to half a minute (the browser writes its session to disk with a short delay); the account, models and Credits then appear in Magpie.
 
-Only the official login page collects credentials; the plugin opens no local page and runs no local listener. A browser already signed in to another SCNet account connects that account; to use a different one, sign out or switch on SCNet and start the browser sign-in again. Signing in again with the same user and plan updates that account. Reading stops after five minutes without a session, and nothing is saved. No extension or separate browser is launched.
+Notes:
 
-SCNet allows one Token Plan per account. When the console lists a used-up plan beside a newly bought one, the plan with Credits left is chosen; if several have Credits, the one ending first. If the plan's models cannot be read, the sign-in fails and points to manual setup rather than guessing models.
+- Supported: Chrome (including Beta/Dev/Canary), Edge and Brave on macOS, as the **default browser**, in a normal window. Private windows can't be read. Only Chrome Beta has been tried with a real account so far.
+- Whatever SCNet account the browser is signed in to is the one connected. To use another, sign out or switch on SCNet first, then start the browser sign-in again.
+- Signing in again with the same user and plan updates that account rather than adding a second one.
+- With no session after five minutes the attempt times out and saves nothing.
 
-## Remove a saved account
+On Windows, Linux, Safari or a machine without a desktop, use manual setup.
 
-Version 0.3.4 adds **管理已保存账号（移除旧 KEY）** to the plugin's method picker. Open the SCNet provider, choose **Add another account**, then this management option. Select a record and confirm its removal. Cancel before confirmation changes nothing; after the completion message, Cancel closes management. Reopen the provider to refresh its list.
+## Manual setup (Windows / Linux / Safari / headless)
 
-This flow does not add an account or open a browser. It can remove the first or last saved SCNet account on unmodified Magpie 0.1.1364. Only the selected local key/cookie record is removed; other records, including another slot carrying the same key, and the vendor's key remain intact. Removing the last account makes its models unavailable until another account is added. It does not change the browser sign-in.
+Choose **手动配置 API Key（高级 / 无桌面环境）** and answer the wizard:
 
-## Advanced manual setup
+| Step | What to enter |
+| --- | --- |
+| Account label | e.g. 主账号, shown as "超算互联网 · 主账号". Signing in again with the same label updates that account. |
+| Models | **Event** for the DeepSeek event plan (`DeepSeek-V4.1-Flash-1017-Event`); otherwise **custom**, with the exact model IDs from your console, separated by commas or new lines. |
+| Credits | **连接额度查询** to show Credits, or **暂不查询额度** to skip. |
+| Console cookie | Only when showing Credits; see below. |
+| Plan | The plan your API key belongs to. |
+| API key | The plan's own key from the Token Plan page (starts with `sk-tp-`). A pay-as-you-go key doesn't draw on plan Credits. |
 
-**手动配置 API Key（高级 / 无桌面环境）** retains account labels, Event/custom models and optional manual Cookie entry for machines without a desktop browser. Browser sign-in is the normal setup path.
+<details>
+<summary>Getting the console cookie (manual setup only)</summary>
 
-## Optional Credits usage
+1. Sign in to the [Token Plan console](https://www.scnet.cn/ui/console/index.html#/llm/token-plan).
+2. Open developer tools (`⌥⌘I` on macOS, `F12` elsewhere) → **Network**.
+3. Reload and filter for `tokenplan/list`.
+4. Open that request and copy the **value** of its `Cookie` request header (no `Cookie:` prefix, not `Set-Cookie`, not a whole cURL command).
+5. Paste it into the wizard's masked field.
 
-Quota uses the SCNet console's internal endpoint, **not** the inference API key:
+A cookie is a login credential: keep it out of issues, chats and screenshots.
 
-```text
-https://www.scnet.cn/acx/charge/account/currentuser/tokenplan/list
+</details>
+
+## Models
+
+- Browser sign-in uses the models included in your plan.
+- Pick `scnet-token-plan/<model ID>` in an agent, e.g. `scnet-token-plan/DeepSeek-V4.1-Flash-1017-Event`.
+- Only your plan's models are listed, not SCNet's whole catalog.
+- SCNet publishes no context or output limits, so none are set (shown as 0, unspecified).
+
+## Credits
+
+Each account shows Credits left, used/total, a percentage and the plan's end date.
+
+- Credits are SCNet's per-model conversion, not tokens.
+- Credits are read for the plan chosen at sign-in. If you **buy a new plan** after one runs out, sign in through the browser again to follow it.
+- A failed Credits read (expired website session, network) only affects the display, never model requests. Signing in again restores it.
+
+## Removing an account
+
+1. Open the SCNet provider and press **Add another … account**.
+2. Choose **管理已保存账号（移除旧 KEY）** and pick the account.
+3. Check its name or key ending and press **确认移除这个账号**. Cancel before that removes nothing.
+4. After 「已移除」, press Cancel to close, then reopen the provider.
+
+Only Magpie's local record is removed; SCNet's key and your other accounts are untouched. The first and the last account can both be removed.
+
+To remove every account, or the plugin itself:
+
+```sh
+magpie plugin logout scnet-token-plan
+magpie plugin rm github:bbingz/scnet-auth
 ```
 
-In your browser, sign in to the [Token Plan console](https://www.scnet.cn/ui/console/index.html#/llm/token-plan), open Developer Tools → Network, refresh, and filter `tokenplan/list`. Copy the **Cookie request-header value** into the wizard's masked field. Do not include `Cookie:`, response `Set-Cookie` headers or a complete cURL command. Select the subscription matching the API key you will enter. The plugin does not combine unrelated subscriptions or verify cookie/key ownership automatically.
+## Troubleshooting
 
-Cookies are login credentials. Keep them out of issues, chat and screenshots. The plugin stores the cookie only in the account's Magpie credential metadata and sends it only to the fixed HTTPS console endpoint, with redirects disabled and a ten-second timeout. It is never sent to inference. Select “暂不查询额度” on a same-label sign-in to clear it.
+**Not found in the market?** Search under **Plugins → Discover**; it is in the **Unofficial, on GitHub** section. Magpie caches the GitHub list for about ten minutes; if the section says some plugins couldn't be read, press **Try again**.
 
-Usage reports remaining Credits, consumed/total Credits, percentage and reported expiry. Reset time is reported only when supplied. Credits are not tokens; no local token-count estimate is used. Missing sessions, expired cookies, incomplete responses and network failures produce actionable Chinese messages and never mark inference credentials as expired. This internal console API may change. The earlier API-key version passed a bounded live inference request; Chrome Beta session import and real quota were independently checked; automated tests use synthetic data grounded in the current console schema.
+**Browser sign-in never finishes?** Make sure you signed in with the **default** browser, in a normal window, and that it is a supported one; allow the Keychain prompt. Manual setup always works.
 
-## Requests and storage
+**The wrong account was connected?** The plugin connects the account the browser is signed in to. Switch accounts on SCNet, sign in again, then remove the one you don't want.
 
-- Provider: `scnet-token-plan`.
-- Base URL: `https://api.scnet.cn/api/llm/v1`.
-- Inference: only `/chat/completions`, using the account's fresh Bearer key. Foreign destinations and redirects are refused.
-- Magpie translates Chat, Responses and Anthropic client protocols. Streams and tool-call payloads pass through.
-- Credentials: `$XDG_CONFIG_HOME/magpie/plugin-auth.json`, normally `~/.config/magpie/plugin-auth.json`.
-- Saving a key locally does not prove SCNet authentication or model entitlement. A dedicated Token Plan key is required to use plan Credits.
-- Magpie is the target host; dynamic prompts and masked secret inputs use its extensions. Native OpenCode execution is unverified.
+**Credits say the console session expired?** SCNet's website session ended. Sign in through the browser again; model requests are unaffected.
+
+**401 / 403 / 429 from requests?** Check whether the plan has ended or run out of Credits, and that the model ID is exact (case, date and `-Event` suffix). SCNet's errors reach Magpie unchanged so it can retry or switch accounts.
+
+**Usage terms.** SCNet allows a Token Plan only for the subscriber's own interactive use in AI tools, not for scripts, app backends or batch calls, and may ban keys that break this. See [SCNet's terms](https://www.scnet.cn/help/docs/mainsite/mass/plans/token-plan.html).
+
+## Privacy and security
+
+- **Read:** only `scnet.cn` cookies from the default browser's last-used profile, filtered by host and path inside a read-only database query. No other profile is scanned, the cookie database isn't copied, and other sites, passwords and history aren't read. The Keychain secret lives only in memory for the attempt and is cleared after.
+- **Stored:** the plan key, SCNet console session, plan ID and model list, in Magpie's credential file `~/.config/magpie/plugin-auth.json` (or `$XDG_CONFIG_HOME/magpie/plugin-auth.json`).
+- **Sent:** model requests only to `https://api.scnet.cn/api/llm/v1/chat/completions`; the console session only to fixed `https://www.scnet.cn` query URLs. Neither follows redirects, and neither is sent to the other.
+- **Never:** creates or resets keys, buys plans, or changes browser or system security settings.
+
+## Technical details
+
+| Item | Value |
+| --- | --- |
+| Provider ID | `scnet-token-plan` |
+| Model base URL | `https://api.scnet.cn/api/llm/v1` |
+| Credits endpoint | `https://www.scnet.cn/acx/charge/account/currentuser/tokenplan/list` (an internal console API that may change) |
+| Runtime | Magpie's bundled Bun; Node.js ≥ 22.13 when run standalone |
+
+See [docs/quota-api.md](docs/quota-api.md) for how sign-in and Credits work. The plugin uses Magpie's OpenCode plugin interface and hasn't been tried in OpenCode itself.
 
 ## Development
 
 ```sh
 npm ci --ignore-scripts
-npm test
+npm test                                   # unit tests
 npm pack --dry-run --ignore-scripts
-# macOS only, with Magpie and Bun installed:
+# macOS with Magpie and Bun installed: real Magpie against a mock SCNet, isolated
 SCNET_TEST_BUN=/absolute/path/to/bun npm run test:magpie
-SCNET_TEST_UI=1 SCNET_TEST_BUN=/absolute/path/to/bun npm run test:magpie
 ```
 
-The harness isolates XDG paths and blocks existing home credentials/process access with macOS sandbox-exec. It tests the real CLI, selected-plan quota and twelve mock gateway cases: Chat/Anthropic/Responses × JSON/SSE × text/tool calls. UI mode starts a temporary browser-accessible Magpie with fake upstream data; Ctrl-C cleans it up. No Docker or real SCNet request is required.
+The integration run uses temporary directories, fake credentials and a macOS sandbox. It never reads or changes your Magpie accounts and never calls the real SCNet.
 
-See [quota source notes](docs/quota-api.md), [Magpie's plugin guide](https://usemagpie.ai/docs/plugins), and [SCNet's Token Plan documentation](https://www.scnet.cn/help/docs/mainsite/mass/plans/token-plan.html).
+## References
+
+- [SCNet Token Plan](https://www.scnet.cn/help/docs/mainsite/mass/plans/token-plan.html)
+- [Magpie plugin guide](https://usemagpie.ai/docs/plugins)
+- [Changelog](CHANGELOG.md)
