@@ -11,7 +11,7 @@ Connects your [SCNet (超算互联网) Token Plan](https://www.scnet.cn/help/doc
 
 An independent MIT-licensed community project, not an official SCNet or Magpie plugin.
 
-![Account and quota in Magpie](docs/account-quota.png)
+<img src="docs/account-quota.png" width="600" alt="Account and quota in Magpie">
 
 *Example screenshot of a manually configured demo account with demo balances. Browser sign-in names accounts "超算互联网 · user · plan".*
 

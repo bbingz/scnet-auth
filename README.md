@@ -11,7 +11,7 @@
 
 社区开源项目（MIT），不是 SCNet 或 Magpie 官方插件。
 
-![Magpie 中的账号与额度](docs/account-quota.png)
+<img src="docs/account-quota.png" width="600" alt="Magpie 中的账号与额度">
 
 *示例截图：手动配置的演示账号，余额为演示数据。浏览器登录的账号名为「超算互联网 · 用户名 · 套餐名」。*
 
